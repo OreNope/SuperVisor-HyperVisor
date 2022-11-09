@@ -1,19 +1,5 @@
-#include <ntddk.h>
-#include <wdf.h>
-#include <wdm.h>
+#include "main.h"
 
-NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObj, PUNICODE_STRING RegistryPath);
-void DriverUnload(PDRIVER_OBJECT DriverObj);
-
-NTSTATUS DriverUnsupported(IN PDEVICE_OBJECT DeviceObj, IN PIRP Irp);
-NTSTATUS DriverCreate(IN PDEVICE_OBJECT DeviceObj, IN PIRP Irp);
-NTSTATUS DriverClose(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp);
-NTSTATUS DriverIoctlDispatcher(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp);
-NTSTATUS DriverRead(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp);
-NTSTATUS DriverWrite(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp);
-
-#pragma alloc_text(INIT, DriverEntry)
-#pragma alloc_text(PAGE, DriverUnload)
 
 NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObj, PUNICODE_STRING RegistryPath)
 {
@@ -77,7 +63,9 @@ NTSTATUS DriverUnsupported(IN PDEVICE_OBJECT DeviceObj, IN PIRP Irp)
 
 NTSTATUS DriverCreate(IN PDEVICE_OBJECT DeviceObj, IN PIRP Irp)
 {
-	DbgPrint("[*] Not implemented yet :( !");
+	AsmEnableVmxOperation();
+
+	DbgPrint("[*] VMX Operation Enabled!");
 
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	Irp->IoStatus.Information = 0;
