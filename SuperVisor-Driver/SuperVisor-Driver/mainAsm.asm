@@ -1,22 +1,22 @@
-PUBLIC AsmEnableVmxOperation
+PUBLIC AsmEnableVmx
 
 .code _text
 
 
-AsmEnableVmxOperation PROC PUBLIC
+AsmEnableVmx PROC PUBLIC
 
 	PUSH RAX
 
 	XOR RAX, RAX
 	mov RAX, CR4
 
-	OR RAX, 2000h	; Turn on the 14th bit
+	OR RAX, 2000h	; Turn on the 14th bit (index 13)
 	MOV CR4, RAX
 
 	POP RAX
 	RET
 
-AsmEnableVmxOperation ENDP
+AsmEnableVmx ENDP
 
 
 END

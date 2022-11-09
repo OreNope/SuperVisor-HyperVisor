@@ -3,7 +3,7 @@
 #include <wdf.h>
 #include <wdm.h>
 
-extern void inline AsmEnableVmxOperation(void);
+extern void inline AsmEnableVmx(void);
 
 NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObj, PUNICODE_STRING RegistryPath);
 void DriverUnload(PDRIVER_OBJECT DriverObj);

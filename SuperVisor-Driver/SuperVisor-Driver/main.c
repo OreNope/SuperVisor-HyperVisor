@@ -63,7 +63,7 @@ NTSTATUS DriverUnsupported(IN PDEVICE_OBJECT DeviceObj, IN PIRP Irp)
 
 NTSTATUS DriverCreate(IN PDEVICE_OBJECT DeviceObj, IN PIRP Irp)
 {
-	AsmEnableVmxOperation();
+	AsmEnableVmx();
 
 	DbgPrint("[*] VMX Operation Enabled!");
 
