@@ -1,56 +1,16 @@
 #include <windows.h>
 #include <iostream>
 #include <string>
+#include "main.h"
 
-std::string getCpuID()
-{
-	char sysType[13];
-	std::string cpuID;
-						
-	_asm
-	{
-		// Execute CPUID with EAX = 0 to get the CPU producer
-		XOR EAX, EAX
-		CPUID
-		// Get the first part
-		MOV DWORD PTR [sysType], EBX
-		// Get the second part the same way but these values are stored in EDX
-		MOV DWORD PTR [sysType + 4], EDX
-		// Get the third part
-		MOV DWORD PTR[sysType + 8], ECX
-		// Null at the end
-		MOV sysType[12], 00
-	}
-
-	cpuID.assign(sysType, 12);
-	return cpuID;
-}
-
-bool detectVmxSupport()
-{
-	bool VMX = false;
-
-	__asm {
-		XOR EAX, EAX
-		INC EAX
-		CPUID
-		BT ECX, 0x5
-		JNC VMXNotSupport
-		// Supported (set vmx to true)
-		MOV VMX, 0x1
-		VMXNotSupport:
-	}
-
-	return VMX;
-}
 
 int main()
 {
-	std::string cpuID = getCpuID();
+	std::string CpuID = GetCpuID();
 
-	std::cout << "[*] The CPU Vendor is: " << cpuID << std::endl;
+	std::cout << "[*] The CPU Vendor is: " << CpuID << std::endl;
 
-	if (cpuID == "GenuineIntel")
+	if (CpuID == "GenuineIntel")
 	{
 		std::cout << "[*] The CPU virtualization technology is VT-x." << std::endl;
 	}
@@ -60,7 +20,7 @@ int main()
 		return 1;
 	}
 
-	if (detectVmxSupport())
+	if (DetectVmxSupport())
 	{
 		std::cout << "[*] VMX Operation is supported by your processor." << std::endl;
 	}
@@ -70,7 +30,7 @@ int main()
 		return 1;
 	}
 
-	HANDLE handle = CreateFile(L"\\\\.\\SuperVisor",
+	HANDLE Handle = CreateFile(L"\\\\.\\SuperVisor",
 						GENERIC_READ | GENERIC_WRITE,
 						FILE_SHARE_READ | FILE_SHARE_WRITE,
 						NULL,
@@ -79,7 +39,68 @@ int main()
 						NULL
 	);
 
+	CHAR InBuff[BUFF_SIZE] = "String by User application! (METHOD_BUFFERED)";
+	CHAR OutBuff[BUFF_SIZE] = { '\0' };
+
+	std::cout << "\nCalling DeviceIoControl METHOD_BUFFERED!" << std::endl;
+
+	ULONG BytesReturned;
+	BOOL Res = DeviceIoControl(Handle, IOCTL_SIOCTL_METHOD_BUFFERED,
+							&InBuff, strlen(InBuff) + 1,
+							&OutBuff, sizeof(OutBuff),
+							&BytesReturned, NULL
+	);
+
+	if (!Res)
+	{
+		std::cerr << "Error in DeviceIoControl: " << GetLastError() << std::endl;
+		return 1;
+	}
+
+	std::cout << "OutBuff (" << BytesReturned << "): " << OutBuff << std::endl;
+
 	std::cin.get();
 
 	return 0;
+}
+
+std::string GetCpuID()
+{
+	char SysType[12];
+	std::string CpuID;
+
+	_asm
+	{
+		// Execute CPUID with EAX = 0 to get the CPU producer
+		// Vendor name stored as (EBX + EDX + ECX)
+		XOR EAX, EAX
+		CPUID
+		// Get the first part (EBX)
+		MOV DWORD PTR[SysType], EBX
+		// Get the second part (EDX)
+		MOV DWORD PTR[SysType + 4], EDX
+		// Get the third part (ECX)
+		MOV DWORD PTR[SysType + 8], ECX
+	}
+
+	CpuID.assign(SysType, sizeof(SysType));
+	return CpuID;
+}
+
+bool DetectVmxSupport()
+{
+	bool VMX = false;
+
+	__asm {
+		XOR EAX, EAX
+		INC EAX
+		CPUID
+		BT ECX, 0x5 // Check for the 6th bit (index 5)
+		JNC VMXNotSupport
+		// Supported (set vmx to true)
+		MOV VMX, 0x1
+		VMXNotSupport:
+	}
+
+	return VMX;
 }

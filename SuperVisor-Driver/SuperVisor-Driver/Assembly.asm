@@ -1,9 +1,9 @@
-PUBLIC AsmEnableVmx
+PUBLIC AsmEnableVmxeBit
 
 .code _text
 
 
-AsmEnableVmx PROC PUBLIC
+AsmEnableVmxeBit PROC PUBLIC
 
 	PUSH RAX
 
@@ -16,7 +16,7 @@ AsmEnableVmx PROC PUBLIC
 	POP RAX
 	RET
 
-AsmEnableVmx ENDP
+AsmEnableVmxeBit ENDP
 
 
 END
