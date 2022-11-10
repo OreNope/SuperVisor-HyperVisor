@@ -22,7 +22,7 @@ BOOLEAN AllocateVmxonRegion(VIRTUAL_MACHINE_STATE* GuestState)
     PHYSICAL_ADDRESS PhysicalMax = { 0 };
     PhysicalMax.QuadPart = MAXULONG64;
 
-    BYTE* VirtualBuff = MmAllocateContiguousMemory(VMXON_SIZE, PhysicalMax);
+    BYTE* VirtualBuff = ExAllocatePoolWithTag(NonPagedPool, VMXON_SIZE, POOLTAG);
 
     if (VirtualBuff == NULL)
     {
@@ -63,7 +63,7 @@ BOOLEAN AllocateVmcsRegion(VIRTUAL_MACHINE_STATE* GuestState)
     PHYSICAL_ADDRESS PhysicalMax = { 0 };
     PhysicalMax.QuadPart = MAXULONG64;
 
-    BYTE* VirtualBuff = MmAllocateContiguousMemory(VMXON_SIZE, PhysicalMax);
+    BYTE* VirtualBuff = ExAllocatePoolWithTag(NonPagedPool, VMCS_SIZE, POOLTAG);
 
     if (VirtualBuff == NULL)
     {

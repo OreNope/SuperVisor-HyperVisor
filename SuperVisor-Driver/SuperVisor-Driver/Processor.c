@@ -2,22 +2,6 @@
 #include <intrin.h>
 #include "IntelMSR.h"
 
-void RunOnEachLogicalProcessor(void (*Callback)(ULONG))
-{
-	KAFFINITY AffinityMask;
-	ULONG ActiveProcessors = KeQueryActiveProcessorCount(NULL);
-
-	for (ULONG i = 0; i < ActiveProcessors; ++i)
-	{
-		AffinityMask = 1LL << i;
-		KeSetSystemAffinityThread(AffinityMask);
-
-		DbgPrint("============= Executing in %dth logical processor =============", i + 1);
-
-		Callback(i);
-	}
-}
-
 BOOLEAN IsVmxSupported()
 {
 	CPUID Data = { 0 };

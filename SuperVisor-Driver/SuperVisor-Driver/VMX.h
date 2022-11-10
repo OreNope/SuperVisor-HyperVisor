@@ -26,4 +26,3 @@ BOOLEAN AllocateVmxonRegion(VIRTUAL_MACHINE_STATE* GuestState);
 BOOLEAN AllocateVmcsRegion(VIRTUAL_MACHINE_STATE* GuestState);
 BOOLEAN InitializeVmx();
 void TerminateVmx();
-void TerminateVmxOnLogicalProcessor(ULONG Index);
