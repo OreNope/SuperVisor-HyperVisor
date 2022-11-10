@@ -2,16 +2,15 @@
 #include <ntddk.h>
 #include <wdf.h>
 #include <wdm.h>
+#include "Assembly.h"
+#include "VMX.h"
 
-// Extern from Assembly.asm file
-extern void inline AsmEnableVmxeBit(void);
-
-NTSTATUS DriverUnsupported(IN PDEVICE_OBJECT DeviceObj, IN PIRP Irp);
-NTSTATUS DriverCreate(IN PDEVICE_OBJECT DeviceObj, IN PIRP Irp);
-NTSTATUS DriverClose(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp);
-NTSTATUS DriverRead(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp);
-NTSTATUS DriverWrite(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp);
-NTSTATUS DriverIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp);
+NTSTATUS DriverCreate(PDEVICE_OBJECT DeviceObj, PIRP Irp);
+NTSTATUS DriverClose(PDEVICE_OBJECT DeviceObject, PIRP Irp);
+NTSTATUS DriverRead(PDEVICE_OBJECT DeviceObject, PIRP Irp);
+NTSTATUS DriverWrite(PDEVICE_OBJECT DeviceObject, PIRP Irp);
+NTSTATUS DriverIoctl(PDEVICE_OBJECT DeviceObject, PIRP Irp);
+NTSTATUS DriverUnsupported(PDEVICE_OBJECT DeviceObj, PIRP Irp);
 
 void PrintIrpInfo(PIRP Irp);
 

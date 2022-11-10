@@ -1,3 +1,6 @@
+#include <ntddk.h>
+#include <wdf.h>
+#include <wdm.h>
 #include "DeviceOps.h"
 
 NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObj, PUNICODE_STRING RegistryPath);
@@ -23,9 +26,9 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObj, PUNICODE_STRING RegistryPath)
 	{
 		DbgPrint("[*] Setting Device's major functions!");
 
-		for (UINT64 Index = 0; Index < IRP_MJ_MAXIMUM_FUNCTION; ++Index)
+		for (UINT64 i = 0; i < IRP_MJ_MAXIMUM_FUNCTION; ++i)
 		{
-			DriverObj->MajorFunction[Index] = DriverUnsupported;
+			DriverObj->MajorFunction[i] = DriverUnsupported;
 		}
 
 		DriverObj->MajorFunction[IRP_MJ_CREATE] = DriverCreate;

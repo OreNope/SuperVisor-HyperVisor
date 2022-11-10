@@ -61,6 +61,8 @@ int main()
 
 	std::cin.get();
 
+	CloseHandle(Handle);
+
 	return 0;
 }
 

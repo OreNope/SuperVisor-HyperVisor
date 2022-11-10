@@ -1,9 +1,11 @@
 #include "DeviceOps.h"
 
-
-NTSTATUS DriverUnsupported(IN PDEVICE_OBJECT DeviceObj, IN PIRP Irp)
+NTSTATUS DriverCreate(PDEVICE_OBJECT DeviceObj, PIRP Irp)
 {
-	DbgPrint("[*] This function is not supported :( !");
+	DbgPrint("[*] DriverCreate Called!");
+
+	if (InitializeVmx())
+		DbgPrint("[*] VMX Initiated Successfully!");
 
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	Irp->IoStatus.Information = 0;
@@ -12,22 +14,11 @@ NTSTATUS DriverUnsupported(IN PDEVICE_OBJECT DeviceObj, IN PIRP Irp)
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS DriverCreate(IN PDEVICE_OBJECT DeviceObj, IN PIRP Irp)
+NTSTATUS DriverClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
-	AsmEnableVmxeBit();
+	DbgPrint("[*] DriverClose Called!");
 
-	DbgPrint("[*] VMX Operation Enabled!");
-
-	Irp->IoStatus.Status = STATUS_SUCCESS;
-	Irp->IoStatus.Information = 0;
-	IoCompleteRequest(Irp, IO_NO_INCREMENT);
-
-	return STATUS_SUCCESS;
-}
-
-NTSTATUS DriverClose(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
-{
-	DbgPrint("[*] Not implemented yet :( !");
+	TerminateVmx();
 
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	Irp->IoStatus.Information = 0;
@@ -37,7 +28,7 @@ NTSTATUS DriverClose(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 }
 
 
-NTSTATUS DriverRead(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
+NTSTATUS DriverRead(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
 	DbgPrint("[*] Not implemented yet :( !");
 
@@ -48,7 +39,7 @@ NTSTATUS DriverRead(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS DriverWrite(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
+NTSTATUS DriverWrite(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
 	DbgPrint("[*] Not implemented yet :( !");
 
@@ -59,7 +50,7 @@ NTSTATUS DriverWrite(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS DriverIoctl(IN PDEVICE_OBJECT DeviceObject, IN PIRP Irp)
+NTSTATUS DriverIoctl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
 	PIO_STACK_LOCATION IrpStack;
 	NTSTATUS NtStatus = STATUS_SUCCESS;
@@ -113,6 +104,17 @@ End:
 	return NtStatus;
 }
 
+NTSTATUS DriverUnsupported(PDEVICE_OBJECT DeviceObj, PIRP Irp)
+{
+	DbgPrint("[*] This function is not supported :( !");
+
+	Irp->IoStatus.Status = STATUS_SUCCESS;
+	Irp->IoStatus.Information = 0;
+	IoCompleteRequest(Irp, IO_NO_INCREMENT);
+
+	return STATUS_SUCCESS;
+}
+
 void PrintIrpInfo(PIRP Irp)
 {
 	PIO_STACK_LOCATION IrpStack = IoGetCurrentIrpStackLocation(Irp);
@@ -125,3 +127,4 @@ void PrintIrpInfo(PIRP Irp)
 	DbgPrint("IrpStack->Parameters.DeviceIoControl.InputBufferLength = %u\n", IrpStack->Parameters.DeviceIoControl.InputBufferLength);
 	DbgPrint("IrpStack->Parameters.DeviceIoControl.OutputBufferLength = %u\n", IrpStack->Parameters.DeviceIoControl.OutputBufferLength);
 }
+
