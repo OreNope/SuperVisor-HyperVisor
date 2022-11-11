@@ -44,6 +44,17 @@ typedef union _IA32_VMX_BASIC_MSR
     } Fields;
 } IA32_VMX_BASIC_MSR, * PIA32_VMX_BASIC_MSR;
 
+typedef union _MSR
+{
+    struct
+    {
+        ULONG Low;
+        ULONG High;
+    };
+
+    ULONG64 Content;
+} MSR, * PMSR;
+
 #define MSR_APIC_BASE            0x01B
 #define MSR_IA32_FEATURE_CONTROL 0x03A
 

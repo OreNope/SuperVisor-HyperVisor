@@ -3,6 +3,8 @@
 
 #define DEPENDENCY_ALLOCATIONS_LEN 5
 
+ULONG64 g_VirtualGuestMemoryAddress;
+
 typedef union _EPTP
 {
     ULONG64 All;

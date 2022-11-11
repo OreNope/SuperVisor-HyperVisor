@@ -1,6 +1,8 @@
 #include "EPT.h"
 #include "VMX.h"
 
+extern UINT64 g_VirtualGuestMemoryAddress;
+
 UINT64 InitializeEptp()
 {
 	PAGED_CODE(); // Assert 
@@ -34,6 +36,7 @@ UINT64 InitializeEptp()
 	const UINT64 PagesToAllocate = 10;
 	UINT64 GuestMemory = ExAllocatePoolWithTag(NonPagedPool, PAGE_SIZE * PagesToAllocate, POOLTAG);
 
+
 	if (!GuestMemory)
 	{
 		for (size_t i = 0; i < DEPENDENCY_ALLOCATIONS_LEN; ++i)
@@ -45,6 +48,8 @@ UINT64 InitializeEptp()
 	}
 
 	RtlZeroMemory(GuestMemory, PAGE_SIZE * PagesToAllocate);
+
+    g_VirtualGuestMemoryAddress = GuestMemory; // First page
 
 	for (size_t i = 0; i < PagesToAllocate; ++i)
 	{

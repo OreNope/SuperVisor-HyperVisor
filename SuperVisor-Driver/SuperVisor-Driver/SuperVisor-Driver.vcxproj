@@ -149,6 +149,7 @@
   <ItemGroup>
     <ClCompile Include="DeviceOps.c" />
     <ClCompile Include="Driver.c" />
+    <ClCompile Include="EPT.c" />
     <ClCompile Include="Memory.c" />
     <ClCompile Include="Processor.c" />
     <ClCompile Include="VMX.c" />
@@ -159,6 +160,7 @@
   <ItemGroup>
     <ClInclude Include="Assembly.h" />
     <ClInclude Include="DeviceOps.h" />
+    <ClInclude Include="EPT.h" />
     <ClInclude Include="IntelMSR.h" />
     <ClInclude Include="Processor.h" />
     <ClInclude Include="VMX.h" />

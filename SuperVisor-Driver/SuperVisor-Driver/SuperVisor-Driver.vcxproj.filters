@@ -39,6 +39,9 @@
     <ClCompile Include="VMX.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="EPT.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DeviceOps.h">
@@ -54,6 +57,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Assembly.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="EPT.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

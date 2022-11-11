@@ -84,13 +84,6 @@ BOOLEAN AllocateVmcsRegion(VIRTUAL_MACHINE_STATE* GuestState)
 
     *(UINT64*)VirtualBuff = basic.Fields.RevisionIdentifier;
 
-    int Status = __vmx_vmptrld(&PhysicalBuff);
-    if (Status)
-    {
-        DbgPrint("[*] VMXCS failed with status %u\n", Status);
-        return FALSE;
-    }
-
     GuestState->VmcsRegion = PhysicalBuff;
 
     return TRUE;
