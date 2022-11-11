@@ -4,12 +4,18 @@
 #include <wdm.h>
 #include <intrin.h>
 #include "IntelMSR.h"
+#include "EPT.h"
+#include "Assembly.h"
 
 #define ALIGNMENT_PAGE_SIZE 4096
 #define MAXIMUM_ADDRESS     0xffffffffffffffff
 #define VMCS_SIZE           4096
 #define VMM_STACK_SIZE      0x8000
+#define RPL_MASK            3
 #define VMXON_SIZE          4096
+
+#define DPL_USER   3
+#define DPL_SYSTEM 0
 
 typedef struct _VIRTUAL_MACHINE_STATE
 {
@@ -21,7 +27,46 @@ typedef struct _VIRTUAL_MACHINE_STATE
     UINT64 MsrBitmapPhysical; // MSR Bitmap Physical Address
 } VIRTUAL_MACHINE_STATE, * PVIRTUAL_MACHINE_STATE;
 
+typedef struct _VMX_EXIT_QUALIFICATION_IO_INSTRUCTION
+{
+    union
+    {
+        ULONG64 Flags;
+
+        struct
+        {
+            ULONG64 SizeOfAccess : 3;
+            ULONG64 AccessType : 1;
+            ULONG64 StringInstruction : 1;
+            ULONG64 RepPrefixed : 1;
+            ULONG64 OperandEncoding : 1;
+            ULONG64 Reserved1 : 9;
+            ULONG64 PortNumber : 16;
+        };
+    };
+} VMX_EXIT_QUALIFICATION_IO_INSTRUCTION, * PVMX_EXIT_QUALIFICATION_IO_INSTRUCTION;
+
+typedef union _MOV_CR_QUALIFICATION
+{
+    ULONG_PTR All;
+    struct
+    {
+        ULONG ControlRegister : 4;
+        ULONG AccessType : 2;
+        ULONG LMSWOperandType : 1;
+        ULONG Reserved1 : 1;
+        ULONG Register : 4;
+        ULONG Reserved2 : 4;
+        ULONG LMSWSourceData : 16;
+        ULONG Reserved3;
+    } Fields;
+} MOV_CR_QUALIFICATION, * PMOV_CR_QUALIFICATION;
+
 extern VIRTUAL_MACHINE_STATE* g_GuestState;
+extern UINT64 g_Cr3TargetCount;
+
+extern UINT64 g_GuestRSP;
+extern UINT64 g_GuestRIP;
 
 #define POOLTAG 0x53564856 // [S]uper[Visor] - [H]yper[V]isor (SVHV)
 
@@ -54,11 +99,14 @@ extern VIRTUAL_MACHINE_STATE* g_GuestState;
 #define CPU_BASED_PAUSE_EXITING               0x40000000
 #define CPU_BASED_ACTIVATE_SECONDARY_CONTROLS 0x80000000
 
-#define CPU_BASED_CTL2_ENABLE_EPT         0x2
-#define CPU_BASED_CTL2_RDTSCP             0x8
-#define CPU_BASED_CTL2_ENABLE_VPID        0x20
-#define CPU_BASED_CTL2_UNRESTRICTED_GUEST 0x80
-#define CPU_BASED_CTL2_ENABLE_VMFUNC      0x2000
+#define CPU_BASED_CTL2_ENABLE_EPT                 0x2
+#define CPU_BASED_CTL2_RDTSCP                     0x8
+#define CPU_BASED_CTL2_ENABLE_VPID                0x20
+#define CPU_BASED_CTL2_UNRESTRICTED_GUEST         0x80
+#define CPU_BASED_CTL2_VIRTUAL_INTERRUPT_DELIVERY 0x200
+#define CPU_BASED_CTL2_ENABLE_INVPCID             0x1000
+#define CPU_BASED_CTL2_ENABLE_VMFUNC              0x2000
+#define CPU_BASED_CTL2_ENABLE_XSAVE_XRSTORS       0x100000
 
 // VM-exit Control Bits
 #define VM_EXIT_IA32E_MODE       0x00000200
@@ -269,15 +317,43 @@ enum VMCS_FIELDS
 #define EXIT_REASON_XRSTORS                      64
 #define EXIT_REASON_PCOMMIT                      65
 
+#define HYPERV_CPUID_VENDOR_AND_MAX_FUNCTIONS 0x40000000
+#define HYPERV_CPUID_INTERFACE                0x40000001
+#define HYPERV_CPUID_VERSION                  0x40000002
+#define HYPERV_CPUID_FEATURES                 0x40000003
+#define HYPERV_CPUID_ENLIGHTMENT_INFO         0x40000004
+#define HYPERV_CPUID_IMPLEMENT_LIMITS         0x40000005
+
+#define HYPERV_HYPERVISOR_PRESENT_BIT 0x80000000
+#define HYPERV_CPUID_MIN              0x40000005
+#define HYPERV_CPUID_MAX              0x4000ffff
+
+// Exit Qualifications for MOV for Control Register Access
+#define TYPE_MOV_TO_CR   0
+#define TYPE_MOV_FROM_CR 1
+#define TYPE_CLTS        2
+#define TYPE_LMSW        3
 
 UINT64 VirtualToPhysicalAddress(void* Va);
 UINT64 PhysicalToVirtualAddress(UINT64 Pa);
 BOOLEAN AllocateVmxonRegion(VIRTUAL_MACHINE_STATE* GuestState);
 BOOLEAN AllocateVmcsRegion(VIRTUAL_MACHINE_STATE* GuestState);
+BOOLEAN AllocateVmmStack(ULONG ProcessorID);
+BOOLEAN AllocateMsrBitmap(ULONG ProcessorID);
+
 BOOLEAN InitializeVmx();
 void TerminateVmx();
-BOOLEAN SetupVmcs(VIRTUAL_MACHINE_STATE* GuestState, PEPTP EPTP);
+void VirtualizeCurrentSystem(ULONG ProcessorID, PEPTP EPTP, PVOID GuestStack);
+BOOLEAN SetupVmcsAndVirtualizeMachine(VIRTUAL_MACHINE_STATE* GuestState, PEPTP EPTP, PVOID GuestStack);
+BOOLEAN SetTargetControls(UINT64 CR3, UINT64 Index);
 VOID MainVmexitHandler(PGUEST_REGS GuestRegs);
+BOOLEAN HandleCPUID(PGUEST_REGS state);
+VOID HandleControlRegisterAccess(PGUEST_REGS GuestState);
+VOID HandleMSRRead(PGUEST_REGS GuestRegs);
+VOID HandleMSRWrite(PGUEST_REGS GuestRegs);
+VOID SetBit(PVOID Addr, UINT64 Bit, BOOLEAN Set);
+VOID GetBit(PVOID Addr, UINT64 Bit);
+BOOLEAN SetMsrBitmap(ULONG64 Msr, int ProcessID, BOOLEAN ReadDetection, BOOLEAN WriteDetection);
 VOID VmResumeInstruction();
 VOID GuestSkipToNextInstruction();
 void FillGuestSelectorData(PVOID GdtBase, ULONG segreg, USHORT Selector);

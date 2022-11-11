@@ -4,6 +4,10 @@
 
 
 extern void inline AsmVmexitHandler(void);
+extern void inline VmxSaveState(ULONG ProcessorID, PEPTP EPTP);
+extern void inline VmxRestoreState();
+extern void inline VmxoffHandler();
+
 extern void inline AsmEnableVmxeBit(void);
 extern void inline AsmSaveStateForVmxoff(void);
 extern void inline AsmVmxoffAndRestoreState(void);

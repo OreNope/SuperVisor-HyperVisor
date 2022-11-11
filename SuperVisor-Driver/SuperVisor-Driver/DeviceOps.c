@@ -1,11 +1,30 @@
 #include "DeviceOps.h"
+#include "Processor.h"
 
 NTSTATUS DriverCreate(PDEVICE_OBJECT DeviceObj, PIRP Irp)
 {
 	DbgPrint("[*] DriverCreate Called!");
 
-	if (InitializeVmx())
-		DbgPrint("[*] VMX Initiated Successfully!");
+	PEPTP EPTP = InitializeEptp();
+	InitializeVmx();
+
+	int LogicalProcessorsCount = KeQueryActiveProcessorCount(0);
+
+	for (size_t i = 0; i < LogicalProcessorsCount; ++i)
+	{
+		// Launching VM for Test (in the all logical processor)
+		int ProcessorID = i;
+
+		// Allocating VMM Stack
+		AllocateVmmStack(ProcessorID);
+
+		// Allocating MSR Bit
+		AllocateMsrBitmap(ProcessorID);
+
+		RunOnProcessor(i, EPTP, VmxSaveState);
+		DbgPrint("\n======================================================================================================\n", ProcessorID);
+	}
+
 
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	Irp->IoStatus.Information = 0;

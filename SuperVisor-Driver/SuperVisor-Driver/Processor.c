@@ -2,6 +2,24 @@
 #include <intrin.h>
 #include "IntelMSR.h"
 
+
+BOOLEAN RunOnProcessor(ULONG ProcessorNumber, PEPTP EPTP, PFUNC Routine)
+{
+	KIRQL OldIrql;
+
+	KeSetSystemAffinityThread((KAFFINITY)(1 << ProcessorNumber));
+
+	OldIrql = KeRaiseIrqlToDpcLevel();
+
+	Routine(ProcessorNumber, EPTP);
+
+	KeLowerIrql(OldIrql);
+
+	KeRevertToUserAffinityThread();
+
+	return TRUE;
+}
+
 BOOLEAN IsVmxSupported()
 {
 	CPUID Data = { 0 };

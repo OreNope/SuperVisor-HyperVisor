@@ -39,6 +39,13 @@ int main()
 						NULL
 	);
 
+	if (Handle == INVALID_HANDLE_VALUE)
+	{
+		DWORD ErrNum = GetLastError();
+		std::cerr << "[*] CreateFile failed : %d" << ErrNum << std::endl;
+		return 1;
+	}
+
 	CHAR InBuff[BUFF_SIZE] = "String by User application! (METHOD_BUFFERED)";
 	CHAR OutBuff[BUFF_SIZE] = { '\0' };
 
