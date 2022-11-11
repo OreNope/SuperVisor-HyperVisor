@@ -1,8 +1,12 @@
 #pragma once
 
 // Extern from Assembly.asm file
+
+
+extern void inline AsmVmexitHandler(void);
 extern void inline AsmEnableVmxeBit(void);
 extern void inline AsmSaveStateForVmxoff(void);
+extern void inline AsmVmxoffAndRestoreState(void);
 extern void inline AsmEnableVmxeBit(void);
 
 extern USHORT inline GetCs();
