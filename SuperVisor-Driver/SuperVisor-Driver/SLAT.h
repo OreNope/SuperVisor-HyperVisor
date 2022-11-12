@@ -2,12 +2,9 @@
 #include <ntddk.h>
 #include <wdm.h>
 #include <wdf.h>
+#include "Memory.h"
 
 #define DEPENDENCY_ALLOCATIONS_LEN 5
-
-#ifndef POOLTAG
-#define POOLTAG 0x53564856 // [S]uper[Visor] - [H]yper[V]isor (SVHV)
-#endif
 
 typedef struct _PML4_ENTRY
 {

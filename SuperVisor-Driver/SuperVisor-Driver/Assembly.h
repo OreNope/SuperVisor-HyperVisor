@@ -5,18 +5,18 @@
 
 // Extern from Assembly.asm file
 
-extern void inline AsmVmexitHandler(void);
-extern void inline VmxSaveState(ULONG ProcessorID, PVOID EPTP);
-extern void inline VmxRestoreState();
-extern void inline VmxoffHandler();
+extern VOID inline AsmVmexitHandler(void);
+extern VOID inline VmxSaveState(ULONG ProcessorID, PVOID EPTP);
+extern VOID inline VmxRestoreState(void);
+extern VOID inline VmxoffHandler(void);
 
 extern ULONG64 inline MSRRead(ULONG32 reg);
-extern void inline MSRWrite(ULONG32 reg, ULONG64 MsrValue);
+extern VOID inline MSRWrite(ULONG32 reg, ULONG64 MsrValue);
 
-extern void inline AsmEnableVmxeBit(void);
-extern void inline AsmSaveStateForVmxoff(void);
-extern void inline AsmVmxoffAndRestoreState(void);
-extern void inline AsmEnableVmxeBit(void);
+extern VOID inline AsmEnableVmxeBit(void);
+extern VOID inline AsmSaveStateForVmxoff(void);
+extern VOID inline AsmVmxoffAndRestoreState(void);
+extern VOID inline AsmEnableVmxeBit(void);
 
 extern USHORT inline GetCs();
 extern USHORT inline GetDs();

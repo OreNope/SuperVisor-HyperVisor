@@ -2,24 +2,6 @@
 #include <intrin.h>
 #include "AMDMSR.h"
 
-
-BOOLEAN RunOnProcessor(ULONG ProcessorNumber, PEPTP EPTP, PFUNC Routine)
-{
-	KIRQL OldIrql;
-
-	KeSetSystemAffinityThread((KAFFINITY)(1 << ProcessorNumber));
-
-	OldIrql = KeRaiseIrqlToDpcLevel();
-
-	Routine(ProcessorNumber, EPTP);
-
-	KeLowerIrql(OldIrql);
-
-	KeRevertToUserAffinityThread();
-
-	return TRUE;
-}
-
 BOOLEAN IsSvmSupported()
 {
 	CPUID Data = { 0 };

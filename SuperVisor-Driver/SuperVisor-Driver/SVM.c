@@ -2,12 +2,6 @@
 #include "Processor.h"
 #include "MsrBitmap.h"
 
-UINT64 g_StackPointer;
-UINT64 g_BasePointer;
-UINT64 g_Cr3TargetCount;
-UINT64 g_GuestRSP;
-UINT64 g_GuestRIP;
-
 BOOLEAN InitializeSvm()
 {
     if (!IsSvmSupported())
@@ -66,118 +60,14 @@ BOOLEAN InitializeSvm()
         __writemsr(IA32_MSR_EFER, __readmsr(IA32_MSR_EFER) | EFER_SVME);
         DbgPrint("[*] SVM Enabled Successfully!");
 
+
+
+        DbgPrint("[*] Prepare for vrtualization...");
         PrepareForVirtualization(VpData, SharedVpData, ContextRecord);
-
-        AllocateVmxonRegion(g_GuestState + _LogicalProcessorIndex);
-        AllocateVmcsRegion(g_GuestState + _LogicalProcessorIndex);
-
-        DbgPrint("[*] VMCS Region is allocated at  ===============> %llx", g_GuestState[_LogicalProcessorIndex].VmcsRegion);
-        DbgPrint("[*] VMXON Region is allocated at ===============> %llx", g_GuestState[_LogicalProcessorIndex].VmxonRegion);
 
     exit:
 
     });
-}
-
-void PrepareForVirtualization(_Inout_ PVIRTUAL_PROCESSOR_DATA VpData, _In_ PSHARED_VIRTUAL_PROCESSOR_DATA SharedVpData, _In_ const CONTEXT* ContextRecord)
-{
-    DESCRIPTOR_TABLE_REGISTER gdtr, idtr;
-    UINT64 guestVmcbPa, hostVmcbPa, hostStateAreaPa, pml4BasePa, msrpmPa;
-
-    // Capture the current GDTR and IDTR to use as initial values of the guest mode.
-    _sgdt(&gdtr);
-    __sidt(&idtr);
-
-    guestVmcbPa = VirtualToPhysicalAddress(&VpData->GuestVmcb);
-    hostVmcbPa = VirtualToPhysicalAddress(&VpData->HostVmcb);
-    hostStateAreaPa = VirtualToPhysicalAddress(&VpData->HostStateArea);
-    pml4BasePa = VirtualToPhysicalAddress(&SharedVpData->Pml4Entries);
-    msrpmPa = VirtualToPhysicalAddress(SharedVpData->MsrPermissionsMap);
-
-    // Configure to trigger #VMEXIT with CPUID and VMRUN instructions. CPUID is
-    // intercepted to present existence of the hypervisor and provide
-    // an interface to ask it to unload itself.
-    VpData->GuestVmcb.ControlArea.InterceptMisc1 |= SVM_INTERCEPT_MISC1_CPUID;
-    VpData->GuestVmcb.ControlArea.InterceptMisc2 |= SVM_INTERCEPT_MISC2_VMRUN;
-
-    // Also, configure to trigger #VMEXIT on MSR access as configured by the
-    // MSRPM. In our case, write to IA32_MSR_EFER is intercepted.
-    VpData->GuestVmcb.ControlArea.InterceptMisc1 |= SVM_INTERCEPT_MISC1_MSR_PROT;
-    VpData->GuestVmcb.ControlArea.MsrpmBasePa = msrpmPa;
-
-    // Specify guest's address space ID (ASID). TLB is maintained by the ID for
-    // guests. Use the same value for all processors since all of them run a
-    // single guest in our case.
-    VpData->GuestVmcb.ControlArea.GuestAsid = 1;
-
-    // Enable Nested Page Tables. By enabling this, the processor performs the
-    // nested page walk, that involves with an additional page walk to translate
-    // a guest physical address to a system physical address. An address of
-    // nested page tables is specified by the NCr3 field of VMCB.
-    
-    // Note that our hypervisor does not trigger any additional #VMEXIT due to
-    // the use of Nested Page Tables since all physical addresses from 0-512 GB
-    // are configured to be accessible from the guest.
-    VpData->GuestVmcb.ControlArea.NpEnable |= SVM_NP_ENABLE_NP_ENABLE;
-    VpData->GuestVmcb.ControlArea.NCr3 = pml4BasePa;
-
-    // Set up the initial guest state based on the current system state. Those
-    // values are loaded into the processor as guest state when the VMRUN
-    // instruction is executed.
-    VpData->GuestVmcb.StateSaveArea.GdtrBase = gdtr.Base;
-    VpData->GuestVmcb.StateSaveArea.GdtrLimit = gdtr.Limit;
-    VpData->GuestVmcb.StateSaveArea.IdtrBase = idtr.Base;
-    VpData->GuestVmcb.StateSaveArea.IdtrLimit = idtr.Limit;
-    
-    VpData->GuestVmcb.StateSaveArea.CsLimit = GetSegmentLimit(ContextRecord->SegCs);
-    VpData->GuestVmcb.StateSaveArea.DsLimit = GetSegmentLimit(ContextRecord->SegDs);
-    VpData->GuestVmcb.StateSaveArea.EsLimit = GetSegmentLimit(ContextRecord->SegEs);
-    VpData->GuestVmcb.StateSaveArea.SsLimit = GetSegmentLimit(ContextRecord->SegSs);
-    VpData->GuestVmcb.StateSaveArea.CsSelector = ContextRecord->SegCs;
-    VpData->GuestVmcb.StateSaveArea.DsSelector = ContextRecord->SegDs;
-    VpData->GuestVmcb.StateSaveArea.EsSelector = ContextRecord->SegEs;
-    VpData->GuestVmcb.StateSaveArea.SsSelector = ContextRecord->SegSs;
-    VpData->GuestVmcb.StateSaveArea.CsAttrib = GetSegmentAccessRight(ContextRecord->SegCs, gdtr.Base);
-    VpData->GuestVmcb.StateSaveArea.DsAttrib = GetSegmentAccessRight(ContextRecord->SegDs, gdtr.Base);
-    VpData->GuestVmcb.StateSaveArea.EsAttrib = GetSegmentAccessRight(ContextRecord->SegEs, gdtr.Base);
-    VpData->GuestVmcb.StateSaveArea.SsAttrib = GetSegmentAccessRight(ContextRecord->SegSs, gdtr.Base);
-
-    VpData->GuestVmcb.StateSaveArea.Efer = __readmsr(IA32_MSR_EFER);
-    VpData->GuestVmcb.StateSaveArea.Cr0 = __readcr0();
-    VpData->GuestVmcb.StateSaveArea.Cr2 = __readcr2();
-    VpData->GuestVmcb.StateSaveArea.Cr3 = __readcr3();
-    VpData->GuestVmcb.StateSaveArea.Cr4 = __readcr4();
-    VpData->GuestVmcb.StateSaveArea.Rflags = ContextRecord->EFlags;
-    VpData->GuestVmcb.StateSaveArea.Rsp = ContextRecord->Rsp;
-    VpData->GuestVmcb.StateSaveArea.Rip = ContextRecord->Rip;
-    VpData->GuestVmcb.StateSaveArea.GPat = __readmsr(IA32_MSR_PAT);
-
-    // Save some of the current state on VMCB. Some of those states are:
-    // - FS, GS, TR, LDTR (including all hidden state)
-    // - KernelGsBase
-    // - STAR, LSTAR, CSTAR, SFMASK
-    // - SYSENTER_CS, SYSENTER_ESP, SYSENTER_EIP
-    
-    // Those are restored to the processor right before #VMEXIT with the VMLOAD
-    // instruction so that the guest can start its execution with saved state,
-    // and also, re-saved to the VMCS with right after #VMEXIT with the VMSAVE
-    // instruction so that the host (hypervisor) do not destroy guest's state.
-    __svm_vmsave(guestVmcbPa);
-
-    // Store data to stack so that the host (hypervisor) can use those values.
-    VpData->HostStackLayout.Reserved1 = MAXUINT64;
-    VpData->HostStackLayout.SharedVpData = SharedVpData;
-    VpData->HostStackLayout.Self = VpData;
-    VpData->HostStackLayout.HostVmcbPa = hostVmcbPa;
-    VpData->HostStackLayout.GuestVmcbPa = guestVmcbPa;
-
-    // Set an address of the host state area to VM_HSAVE_PA MSR. The processor
-    // saves some of the current state on VMRUN and loads them on #VMEXIT. See
-    __writemsr(SVM_MSR_VM_HSAVE_PA, hostStateAreaPa);
-
-    // Also, save some of the current state to VMCB for the host. This is loaded
-    // after #VMEXIT to reproduce the current state for the host (hypervisor).
-    __svm_vmsave(hostVmcbPa);
 }
 
 UINT16 GetSegmentAccessRight(_In_ UINT16 SegmentSelector, _In_ ULONG_PTR GdtBase)
@@ -201,7 +91,7 @@ UINT16 GetSegmentAccessRight(_In_ UINT16 SegmentSelector, _In_ ULONG_PTR GdtBase
     return attribute.AsUInt16;
 }
 
-void TerminateVmx()
+VOID TerminateVmx()
 {
 	DbgPrint("\n[*] Terminating VMX...\n");
 
@@ -222,230 +112,6 @@ void TerminateVmx()
     });
 
     DbgPrint("[*] VMX Operation turned off successfully!\n");
-}
-
-void VirtualizeCurrentSystem(ULONG ProcessorID, PEPTP EPTP, PVOID GuestStack)
-{
-    DbgPrint("\n======================== Launching VM =============================\n");
-
-    KAFFINITY AffinityMask;
-    AffinityMask = 1LL << ProcessorID;
-    KeSetSystemAffinityThread(AffinityMask);
-
-    DbgPrint("============= Executing in %uth logical processor =============", ProcessorID + 1);
-
-
-    // Clear the VMCS State
-    if (!ClearVmcsState(&g_GuestState[ProcessorID]))
-    {
-        DbgPrint("[*] Fail to clear VMCS state!\n");
-        return FALSE;
-    }
-
-    // Load VMCS (Set the Current VMCS)
-    if (!LoadVmcs(&g_GuestState[ProcessorID]))
-    {
-        DbgPrint("[*] Fail to load VMCS!\n");
-        return FALSE;
-    }
-
-    DbgPrint("[*] Setting up VMCS.\n");
-    SetupVmcsAndVirtualizeMachine(&g_GuestState[ProcessorID], EPTP, GuestStack);
-
-    DbgPrint("[*] Executing VMLANUNCH.\n");
-
-    AsmSaveStateForVmxoff();
-
-    __vmx_vmlaunch();
-
-    // this code runs only if vmlaunch failed!
-    ULONG64 ErrorCode = 0;
-    __vmx_vmread(VM_INSTRUCTION_ERROR, &ErrorCode);
-    __vmx_off();
-    DbgPrint("[*] VMLAUNCH Error: 0x%llx\n", ErrorCode);
-    DbgBreakPoint();
-
-    return TRUE;
-}
-
-BOOLEAN SetupVmcsAndVirtualizeMachine(VIRTUAL_MACHINE_STATE* GuestState, PEPTP EPTP, PVOID GuestStack)
-{
-    BOOLEAN Status = FALSE;
-
-    // & 0xF8 is because Intel mentioned that the three less significant bits must be cleared
-    __vmx_vmwrite(HOST_ES_SELECTOR, GetEs() & 0xf8);
-    __vmx_vmwrite(HOST_CS_SELECTOR, GetCs() & 0xf8);
-    __vmx_vmwrite(HOST_SS_SELECTOR, GetSs() & 0xf8);
-    __vmx_vmwrite(HOST_DS_SELECTOR, GetDs() & 0xf8);
-    __vmx_vmwrite(HOST_FS_SELECTOR, GetFs() & 0xf8);
-    __vmx_vmwrite(HOST_GS_SELECTOR, GetGs() & 0xf8);
-    __vmx_vmwrite(HOST_TR_SELECTOR, GetTr() & 0xf8);
-
-    // Setting the link pointer to the required value for 4KB VMCS
-    __vmx_vmwrite(VMCS_LINK_POINTER, ~0ULL);
-
-    __vmx_vmwrite(GUEST_IA32_DEBUGCTL, __readmsr(MSR_IA32_DEBUGCTL) & (~0L));
-    __vmx_vmwrite(GUEST_IA32_DEBUGCTL_HIGH, __readmsr(MSR_IA32_DEBUGCTL) >> 32);
-
-    // Time-stamp counter
-    __vmx_vmwrite(TSC_OFFSET, 0);
-    __vmx_vmwrite(TSC_OFFSET_HIGH, 0);
-
-    __vmx_vmwrite(PAGE_FAULT_ERROR_CODE_MASK, 0);
-    __vmx_vmwrite(PAGE_FAULT_ERROR_CODE_MATCH, 0);
-
-    __vmx_vmwrite(VM_EXIT_MSR_STORE_COUNT, 0);
-    __vmx_vmwrite(VM_EXIT_MSR_LOAD_COUNT, 0);
-
-    __vmx_vmwrite(VM_ENTRY_MSR_LOAD_COUNT, 0);
-    __vmx_vmwrite(VM_ENTRY_INTR_INFO_FIELD, 0);
-
-    ULONG64 GdtBase = GetGdtBase();
-
-    FillGuestSelectorData((PVOID)GdtBase, ES, GetEs());
-    FillGuestSelectorData((PVOID)GdtBase, CS, GetCs());
-    FillGuestSelectorData((PVOID)GdtBase, SS, GetSs());
-    FillGuestSelectorData((PVOID)GdtBase, DS, GetDs());
-    FillGuestSelectorData((PVOID)GdtBase, FS, GetFs());
-    FillGuestSelectorData((PVOID)GdtBase, GS, GetGs());
-    FillGuestSelectorData((PVOID)GdtBase, LDTR, GetLdtr());
-    FillGuestSelectorData((PVOID)GdtBase, TR, GetTr());
-
-    __vmx_vmwrite(GUEST_FS_BASE, __readmsr(MSR_FS_BASE));
-    __vmx_vmwrite(GUEST_GS_BASE, __readmsr(MSR_GS_BASE));
-
-    __vmx_vmwrite(GUEST_INTERRUPTIBILITY_INFO, 0);
-    __vmx_vmwrite(GUEST_ACTIVITY_STATE, 0);
-
-    DbgPrint("[*] MSR_IA32_VMX_PROCBASED_CTLS : 0x%llx\n", AdjustControls(CPU_BASED_ACTIVATE_MSR_BITMAP | CPU_BASED_ACTIVATE_SECONDARY_CONTROLS, MSR_IA32_VMX_PROCBASED_CTLS));
-    DbgPrint("[*] MSR_IA32_VMX_PROCBASED_CTLS2 : 0x%llx\n", AdjustControls(CPU_BASED_CTL2_RDTSCP | CPU_BASED_CTL2_ENABLE_INVPCID | CPU_BASED_CTL2_ENABLE_XSAVE_XRSTORS, MSR_IA32_VMX_PROCBASED_CTLS2));
-
-    __vmx_vmwrite(CPU_BASED_VM_EXEC_CONTROL, AdjustControls(CPU_BASED_ACTIVATE_MSR_BITMAP | CPU_BASED_ACTIVATE_SECONDARY_CONTROLS, MSR_IA32_VMX_PROCBASED_CTLS));
-    __vmx_vmwrite(SECONDARY_VM_EXEC_CONTROL, AdjustControls(CPU_BASED_CTL2_RDTSCP | CPU_BASED_CTL2_ENABLE_INVPCID | CPU_BASED_CTL2_ENABLE_XSAVE_XRSTORS, MSR_IA32_VMX_PROCBASED_CTLS2));
-
-    __vmx_vmwrite(PIN_BASED_VM_EXEC_CONTROL, AdjustControls(0, MSR_IA32_VMX_PINBASED_CTLS));
-    __vmx_vmwrite(VM_EXIT_CONTROLS, AdjustControls(VM_EXIT_IA32E_MODE | VM_EXIT_ACK_INTR_ON_EXIT, MSR_IA32_VMX_EXIT_CTLS));
-    __vmx_vmwrite(VM_ENTRY_CONTROLS, AdjustControls(VM_ENTRY_IA32E_MODE, MSR_IA32_VMX_ENTRY_CTLS));
-
-    __vmx_vmwrite(CR3_TARGET_COUNT, 0);
-    __vmx_vmwrite(CR3_TARGET_VALUE0, 0);
-    __vmx_vmwrite(CR3_TARGET_VALUE1, 0);
-    __vmx_vmwrite(CR3_TARGET_VALUE2, 0);
-    __vmx_vmwrite(CR3_TARGET_VALUE3, 0);
-
-    __vmx_vmwrite(CR0_GUEST_HOST_MASK, 0);
-    __vmx_vmwrite(CR4_GUEST_HOST_MASK, 0);
-    __vmx_vmwrite(CR0_READ_SHADOW, 0);
-    __vmx_vmwrite(CR4_READ_SHADOW, 0);
-
-    __vmx_vmwrite(GUEST_CR0, __readcr0());
-    __vmx_vmwrite(GUEST_CR3, __readcr3());
-    __vmx_vmwrite(GUEST_CR4, __readcr4());
-
-    __vmx_vmwrite(HOST_CR0, __readcr0());
-    __vmx_vmwrite(HOST_CR3, __readcr3());
-    __vmx_vmwrite(HOST_CR4, __readcr4());
-
-    __vmx_vmwrite(GUEST_GDTR_BASE, GetGdtBase());
-    __vmx_vmwrite(GUEST_IDTR_BASE, GetIdtBase());
-    __vmx_vmwrite(GUEST_GDTR_LIMIT, GetGdtLimit());
-    __vmx_vmwrite(GUEST_IDTR_LIMIT, GetIdtLimit());
-
-    __vmx_vmwrite(GUEST_RFLAGS, GetRflags());
-
-    __vmx_vmwrite(GUEST_SYSENTER_CS, __readmsr(MSR_IA32_SYSENTER_CS));
-    __vmx_vmwrite(GUEST_SYSENTER_EIP, __readmsr(MSR_IA32_SYSENTER_EIP));
-    __vmx_vmwrite(GUEST_SYSENTER_ESP, __readmsr(MSR_IA32_SYSENTER_ESP));
-    __vmx_vmwrite(HOST_IA32_SYSENTER_CS, __readmsr(MSR_IA32_SYSENTER_CS));
-    __vmx_vmwrite(HOST_IA32_SYSENTER_EIP, __readmsr(MSR_IA32_SYSENTER_EIP));
-    __vmx_vmwrite(HOST_IA32_SYSENTER_ESP, __readmsr(MSR_IA32_SYSENTER_ESP));
-
-    SEGMENT_SELECTOR SegmentSelector = { 0 };
-
-    GetSegmentDescriptor(&SegmentSelector, GetTr(), (PUCHAR)GetGdtBase());
-    __vmx_vmwrite(HOST_TR_BASE, SegmentSelector.BASE);
-
-    __vmx_vmwrite(HOST_FS_BASE, __readmsr(MSR_FS_BASE));
-    __vmx_vmwrite(HOST_GS_BASE, __readmsr(MSR_GS_BASE));
-
-    __vmx_vmwrite(HOST_GDTR_BASE, GetGdtBase());
-    __vmx_vmwrite(HOST_IDTR_BASE, GetIdtBase());
-
-    __vmx_vmwrite(GUEST_RSP, GuestStack); // setup guest sp
-    __vmx_vmwrite(GUEST_RIP, VmxRestoreState); // setup guest ip
-
-    __vmx_vmwrite(HOST_RSP, ((ULONG64)GuestState->VmmStack + VMM_STACK_SIZE - 1));
-    __vmx_vmwrite(HOST_RIP, (ULONG64)AsmVmexitHandler);
-}
-
-BOOLEAN SetTargetControls(UINT64 CR3, UINT64 Index)
-{
-    //
-    // Index starts from 0 , not 1
-    //
-    if (Index >= 4)
-    {
-        //
-        // Not supported for more than 4 , at least for now :(
-        //
-        return FALSE;
-    }
-
-    UINT64 temp = 0;
-
-    if (CR3 == 0)
-    {
-        if (g_Cr3TargetCount <= 0)
-        {
-            //
-            // Invalid command as g_Cr3TargetCount cannot be less than zero
-            // s
-            return FALSE;
-        }
-        else
-        {
-            g_Cr3TargetCount -= 1;
-            if (Index == 0)
-            {
-                __vmx_vmwrite(CR3_TARGET_VALUE0, 0);
-            }
-            if (Index == 1)
-            {
-                __vmx_vmwrite(CR3_TARGET_VALUE1, 0);
-            }
-            if (Index == 2)
-            {
-                __vmx_vmwrite(CR3_TARGET_VALUE2, 0);
-            }
-            if (Index == 3)
-            {
-                __vmx_vmwrite(CR3_TARGET_VALUE3, 0);
-            }
-        }
-    }
-    else
-    {
-        if (Index == 0)
-        {
-            __vmx_vmwrite(CR3_TARGET_VALUE0, CR3);
-        }
-        if (Index == 1)
-        {
-            __vmx_vmwrite(CR3_TARGET_VALUE1, CR3);
-        }
-        if (Index == 2)
-        {
-            __vmx_vmwrite(CR3_TARGET_VALUE2, CR3);
-        }
-        if (Index == 3)
-        {
-            __vmx_vmwrite(CR3_TARGET_VALUE3, CR3);
-        }
-        g_Cr3TargetCount += 1;
-    }
-
-    __vmx_vmwrite(CR3_TARGET_COUNT, g_Cr3TargetCount);
-    return TRUE;
 }
 
 VOID MainVmexitHandler(PGUEST_REGS GuestRegs)
@@ -835,54 +501,6 @@ VOID GuestSkipToNextInstruction()
     __vmx_vmwrite(GUEST_RIP, (ULONG64)ResumeRIP);
 }
 
-void FillGuestSelectorData(PVOID GdtBase, ULONG Segreg, USHORT Selector)
-{
-    SEGMENT_SELECTOR SegmentSelector = { 0 };
-    ULONG AccessRights = 0;
-
-    GetSegmentDescriptor(&SegmentSelector, Selector, GdtBase);
-    AccessRights = ((PUCHAR)&SegmentSelector.ATTRIBUTES)[0] + (((PUCHAR)&SegmentSelector.ATTRIBUTES)[1] << 12);
-
-    if (!Selector)
-        AccessRights |= 0x10000;
-
-    __vmx_vmwrite(GUEST_ES_SELECTOR + Segreg * 2, Selector);
-    __vmx_vmwrite(GUEST_ES_LIMIT + Segreg * 2, SegmentSelector.LIMIT);
-    __vmx_vmwrite(GUEST_ES_AR_BYTES + Segreg * 2, AccessRights);
-    __vmx_vmwrite(GUEST_ES_BASE + Segreg * 2, SegmentSelector.BASE);
-}
-
-BOOLEAN GetSegmentDescriptor(PSEGMENT_SELECTOR SegmentSelector, USHORT Selector, PUCHAR GdtBase)
-{
-    PSEGMENT_DESCRIPTOR SegDesc = NULL;
-
-    if (!SegmentSelector || Selector & 0x4)
-        return FALSE;
-
-    SegDesc = (PSEGMENT_DESCRIPTOR)((PUCHAR)GdtBase + (Selector & ~0x7));
-
-    SegmentSelector->SEL = Selector;
-    SegmentSelector->BASE = SegDesc->BASE0 | SegDesc->BASE1 << 16 | SegDesc->BASE2 << 24;
-    SegmentSelector->LIMIT = SegDesc->LIMIT0 | (SegDesc->LIMIT1ATTR1 & 0xf) << 16;
-    SegmentSelector->ATTRIBUTES.UCHARs = SegDesc->ATTR0 | (SegDesc->LIMIT1ATTR1 & 0xf0) << 4;
-
-    if (!(SegDesc->ATTR0 & 0x10))
-    { // LA_ACCESSED
-        ULONG64 Tmp;
-        // this is a TSS or callgate etc, save the base high part
-        Tmp = (*(PULONG64)((PUCHAR)SegDesc + 8));
-        SegmentSelector->BASE = (SegmentSelector->BASE & 0xffffffff) | (Tmp << 32);
-    }
-
-    if (SegmentSelector->ATTRIBUTES.Fields.G)
-    {
-        // 4096-bit granularity is enabled for this segment, scale the limit
-        SegmentSelector->LIMIT = (SegmentSelector->LIMIT << 12) + 0xfff;
-    }
-
-    return TRUE;
-}
-
 ULONG AdjustControls(ULONG Ctl, ULONG Msr)
 {
     MSR MsrValue = { 0 };
@@ -891,47 +509,5 @@ ULONG AdjustControls(ULONG Ctl, ULONG Msr)
     Ctl &= MsrValue.Fields.High; /* bit == 0 in high word ==> must be zero */
     Ctl |= MsrValue.Fields.Low;  /* bit == 1 in low word  ==> must be one  */
     return Ctl;
-}
-
-UINT64 VmptrstInstruction()
-{
-    UINT64 VmcsPa;
-
-    __vmx_vmptrst(&VmcsPa);
-
-    DbgPrint("[*] VMPTRST %llx\n", VmcsPa);
-
-    return VmcsPa;
-}
-
-BOOLEAN ClearVmcsState(VIRTUAL_MACHINE_STATE* GuestState)
-{
-    int Status = __vmx_vmclear(&GuestState->VmcsRegion);
-
-    DbgPrint("[*] VMCS VMCLEAR Status is: %d\n", Status);
-
-    if (Status)
-    {
-        DbgPrint("[*] VMCS failed to clear with status: %d\n", Status);
-        __vmx_off();
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
-BOOLEAN LoadVmcs(VIRTUAL_MACHINE_STATE* GuestState)
-{
-    int Status = __vmx_vmptrld(&GuestState->VmcsRegion);
-
-    DbgPrint("[*] VMCS VMPTRLD Status is: %d\n", Status);
-
-    if (Status)
-    {
-        DbgPrint("[*] VMCS failed with status: %d\n", Status);
-        return FALSE;
-    }
-
-    return TRUE;
 }
 

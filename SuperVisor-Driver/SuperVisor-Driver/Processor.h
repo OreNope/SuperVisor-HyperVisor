@@ -12,8 +12,4 @@
 													Operations\
 												}
 
-
-typedef void (*PFUNC)(IN ULONG ProcessorID, IN PEPTP EPTP);
-
-BOOLEAN RunOnProcessor(ULONG ProcessorNumber, PEPTP EPTP, PFUNC Routine);
 BOOLEAN IsSvmSupported();
