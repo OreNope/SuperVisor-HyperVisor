@@ -1,345 +1,186 @@
-PUBLIC AsmVmexitHandler
-PUBLIC VmxSaveState
-PUBLIC VmxRestoreState
-PUBLIC VmxoffHandler
 
-PUBLIC AsmEnableVmxeBit
-PUBLIC AsmSaveStateForVmxoff
-PUBLIC AsmVmxoffAndRestoreState
+extern HandleVmExit:PROC
 
-PUBLIC GetCs
-PUBLIC GetDs
-PUBLIC GetSs
-PUBLIC GetEs
-PUBLIC GetFs
-PUBLIC GetGs
-PUBLIC GetLdtr
-PUBLIC GetTr
-PUBLIC GetGdtBase
-PUBLIC GetIdtBase
-PUBLIC GetGdtLimit
-PUBLIC GetIdtLimit
-PUBLIC GetRflags
+.const
 
-PUBLIC MSRRead
-PUBLIC MSRWrite
+KTRAP_FRAME_SIZE            equ     190h
+MACHINE_FRAME_SIZE          equ     28h
 
-EXTERN g_StackPointer:QWORD
-EXTERN g_BasePointer:QWORD
-
-EXTERN g_GuestRIP:QWORD
-EXTERN g_GuestRSP:QWORD
-
-EXTERN MainVmexitHandler:PROC
-EXTERN VmResumeInstruction:PROC
-EXTERN VirtualizeCurrentSystem:PROC
 
 .code _text
 
+PUSHAQ MACRO
+        push    rax
+        push    rcx
+        push    rdx
+        push    rbx
+        push    -1      ; Dummy for rsp.
+        push    rbp
+        push    rsi
+        push    rdi
+        push    r8
+        push    r9
+        push    r10
+        push    r11
+        push    r12
+        push    r13
+        push    r14
+        push    r15
+ENDM
 
-AsmVmexitHandler PROC PUBLIC
+POPAQ MACRO
+        pop     r15
+        pop     r14
+        pop     r13
+        pop     r12
+        pop     r11
+        pop     r10
+        pop     r9
+        pop     r8
+        pop     rdi
+        pop     rsi
+        pop     rbp
+        pop     rbx    ; Dummy for rsp (this value is destroyed by the next pop).
+        pop     rbx
+        pop     rdx
+        pop     rcx
+        pop     rax
+ENDM
 
-	push r15
-    push r14
-    push r13
-    push r12
-    push r11
-    push r10
-    push r9
-    push r8        
-    push rdi
-    push rsi
-    push rbp
-    push rbp
-    push rbx
-    push rdx
-    push rcx
-    push rax
+AsmLaunchVm PROC PUBLIC
+        ; Update the current stack pointer with the host RSP. This protects
+        ; values stored on stack for the hypervisor from being overwritten by
+        ; the guest due to a use of the same stack memory.
 
-	mov rcx, rsp ; guest registers
-	sub rsp, 28h ; restore
+        mov rsp, rcx    ; Rsp <= HostRsp
 
-	call MainVmexitHandler
-	add rsp, 28h
+LocalVirtualizationLaunch:
+        ; Run the loop to executed the guest and handle #VMEXIT. Below is the
+        ; current stack layout.
+        ; ----
+        ; Rsp          => 0x...fd0 GuestVmcbPa       ; HostStackLayout
+        ;                 0x...fd8 HostVmcbPa        ;
+        ;                 0x...fe0 Self              ;
+        ;                 0x...fe8 SharedVpData      ;
+        ;                 0x...ff0 Padding1          ;
+        ;                 0x...ff8 Reserved1         ;
 
-	pop rax
-	pop rcx
-	pop rdx
-	pop rbx
-	pop rbp
-	pop rbp
-	pop rsi
-	pop rdi 
-	pop r8
-	pop r9
-	pop r10
-	pop r11
-	pop r12
-	pop r13
-	pop r14
-	pop r15
+        mov rax, [rsp]  ; RAX <= VpData->HostStackLayout.GuestVmcbPa
+        vmload rax      ; load previously saved guest state from VMCB
 
-	sub rsp, 0100h ; to avoid error in future functions
+        ; Start the guest. The VMRUN instruction resumes execution of the guest
+        ; with state described in VMCB (specified by RAX by its physical address)
 
-	jmp VmResumeInstruction
+        vmrun rax       ; Switch to the guest until #VMEXIT
+
+        ; #VMEXIT occured. Now, some of guest state has been saved to VMCB, but
+        ; not all of it. Save some of unsaved state with the VMSAVE instruction.
+        
+        ; RAX (and some other state like RSP) has been restored from the host
+        ; state-save, so it has the same value as before and not guest's one.
+        
+        vmsave rax      ; Save current guest state to VMCB
+
+        ; Optionally, allocate the trap frame so that Windbg can display stack
+        ; trace of the guest while SvHandleVmExit is being executed. The trap
+        ; frame fields necessary for this are initialized in SvHandleVmExit.
+        .pushframe
+        sub     rsp, KTRAP_FRAME_SIZE
+        .allocstack KTRAP_FRAME_SIZE - MACHINE_FRAME_SIZE + 100h
+
+        ; Also save guest's GPRs since those are not saved anywhere by the
+        ; processor on #VMEXIT and will be destroyed by subsequent host code.
+        PUSHAQ          ; Stack pointer decreased 8 * 16
+
+        ; Set parameters for SvHandleVmExit. Below is the current stack leyout.
+        ; ----
+        ; Rsp                             => 0x...dc0 R15               ; GUEST_REGISTERS
+        ;                                    0x...dc8 R14               ;
+        ;                                             ...               ;
+        ;                                    0x...e38 RAX               ;
+        ; Rsp + 8 * 16                    => 0x...e40 TrapFrame         ; HostStackLayout
+        ;                                             ...               ;
+        ; Rsp + 8 * 16 + KTRAP_FRAME_SIZE => 0x...fd0 GuestVmcbPa       ;
+        ;                                    0x...fd8 HostVmcbPa        ;
+        ; Rsp + 8 * 18 + KTRAP_FRAME_SIZE => 0x...fe0 Self              ;
+        ;                                    0x...fe8 SharedVpData      ;
+        ;                                    0x...ff0 Padding1          ;
+        ;                                    0x...ff8 Reserved1         ;
+        ; ----
+
+        mov rdx, rsp                                ; Rdx <= GuestRegisters
+        mov rcx, [rsp + 8 * 18 + KTRAP_FRAME_SIZE]  ; Rcx <= VpData
+
+        ; Allocate stack for homing space (0x20) and volatile XMM registers
+        ; (0x60). Save those registers because subsequent host code may destroy
+        ; any of those registers. XMM6-15 are not saved because those should be
+        ; preserved (those are non volatile registers). Finally, indicates the
+        ; end of the function prolog as stack pointer changes are all done. This
+        ; is for Windbg to reconstruct stack trace.
+        sub rsp, 80h
+        movaps xmmword ptr [rsp + 20h], xmm0
+        movaps xmmword ptr [rsp + 30h], xmm1
+        movaps xmmword ptr [rsp + 40h], xmm2
+        movaps xmmword ptr [rsp + 50h], xmm3
+        movaps xmmword ptr [rsp + 60h], xmm4
+        movaps xmmword ptr [rsp + 70h], xmm5
+        .endprolog
+
+        ; Handle #VMEXIT.
+        call HandleVmExit
+
+        ; Restore XMM registers and roll back stack pointer.
+        movaps xmm5, xmmword ptr [rsp + 70h]
+        movaps xmm4, xmmword ptr [rsp + 60h]
+        movaps xmm3, xmmword ptr [rsp + 50h]
+        movaps xmm2, xmmword ptr [rsp + 40h]
+        movaps xmm1, xmmword ptr [rsp + 30h]
+        movaps xmm0, xmmword ptr [rsp + 20h]
+        add rsp, 80h
+
+        ; Test a return value of SvHandleVmExit (RAX), then POPAQ to restore the
+        ; original guest's GPRs.
+        test al, al
+        POPAQ
+
+        ; If non zero value is returned from SvHandleVmExit, this function exits
+        ; the loop. Otherwise, continue the loop and resume the guest.
+        
+        jnz LocalVirtualizationTerminated ; if (ExitVm != 0) jmp LocalVirtualizationTerminated
+        add rsp, KTRAP_FRAME_SIZE   ; else, restore RSP and
+        jmp LocalVirtualizationLaunch  ; jmp LocalVirtualizationLaunch
+
+LocalVirtualizationTerminated:
+        ; Virtualization has been terminated. Restore an original (guest's,
+        ; although it is no longer the "guest") stack pointer and return to the
+        ; next instruction of CPUID triggered this #VMEXIT.
+        
+        ; Here is contents of certain registers:
+        ;   RBX     = An address to return
+        ;   RCX     = An original stack pointer to restore
+        ;   EDX:EAX = An address of per processor data for this processor
+        
+        mov rsp, rcx
+
+        ; Update RCX with the magic value indicating that the hypervisor has been unloaded.
+        mov ecx, 'SVYV'
+
+        ; Return to the next instruction of CPUID triggered this #VMEXIT. The
+        ; registry values to be returned are:
+        ;   EBX     = Undefined
+        ;   ECX     = 'SVYV'
+        ;   EDX:EAX = An address of per processor data for this processor
+        
+        jmp rbx
+AsmLaunchVm ENDP
 
 
-AsmVmexitHandler ENDP
+AsmGetGdt PROC PUBLIC
 
-VmxoffHandler PROC PUBLIC
-
-	; Turn VMXOFF
-	vmxoff
-
-	; Restore the state
-
-	pop rax
-    pop rcx
-    pop rdx
-    pop rbx
-    pop rbp
-    pop rbp
-    pop rsi
-    pop rdi 
-    pop r8
-    pop r9
-    pop r10
-    pop r11
-    pop r12
-    pop r13
-    pop r14
-    pop r15
-
-	; Set guest RIP and RSP
-
-	mov	rsp, g_GuestRSP
-
-	jmp g_GuestRIP
-
-VmxoffHandler ENDP
-
-VmxSaveState PROC PUBLIC
-
-	push rax
-	push rcx
-	push rdx
-	push rbx
-	push rbp
-	push rsi
-	push rdi
-	push r8
-	push r9
-	push r10
-	push r11
-	push r12
-	push r13
-	push r14
-	push r15
-
-	sub rsp, 28h
-
-	mov r8, rsp
-
-	call VirtualizeCurrentSystem
-
+	; Param store in rcx
+	sgdt [rcx]
 	ret
 
-VmxSaveState ENDP
-
-VmxRestoreState PROC PUBLIC
-
-	add rsp, 28h
-	pop r15
-	pop r14
-	pop r13
-	pop r12
-	pop r11
-	pop r10
-	pop r9
-	pop r8
-	pop rdi
-	pop rsi
-	pop rbp
-	pop rbx
-	pop rdx
-	pop rcx
-	pop rax
-	
-	ret
-	
-VmxRestoreState ENDP
-
-AsmEnableSvmEnabledBit PROC PUBLIC
-
-	push rax
-	push rcx
-	push rdx
-	push rbx
-
-	mov rcx, 0xc0000080 ; IA32_MSR_EFER
-	rdmsr
-	mov ebx, 0x1000 ; 1 << 12
-	or eax, ebx ; turn on the 12 bit
-	wrmsr ; update the EFER
-
-	pop rbx
-	pop rdx
-	pop rcx
-	pop rax
-	ret
-
-AsmEnableVmxeBit ENDP
-
-AsmSaveStateForVmxoff PROC PUBLIC
-
-	mov g_StackPointer, rsp
-	mov g_BasePointer, rbp
-	ret
-
-AsmSaveStateForVmxoff ENDP
-
-AsmVmxoffAndRestoreState PROC PUBLIC
-
-	vmxoff
-
-	mov rsp, g_StackPointer
-	mov rbp, g_BasePointer
-
-	add rsp, 8
-
-	mov rax, 1
-
-	mov rbx, [rsp + 28h + 8h]
-	mov rsi, [rsp + 28h + 10h]
-	add rsp, 20h
-	pop rdi
-
-	ret
-
-AsmVmxoffAndRestoreState ENDP
-
-GetGdtBase PROC PUBLIC
-
-	local gdtr[10]:BYTE
-	sgdt gdtr
-	mov rax, QWORD PTR gdtr[2]
-
-	ret
-
-GetGdtBase ENDP
-
-GetCs PROC PUBLIC
-
-	mov rax, cs
-	ret
-
-GetCs ENDP
-
-GetDs PROC PUBLIC
-
-	mov rax, ds
-	ret
-
-GetDs ENDP
-
-GetSs PROC PUBLIC
-
-	mov rax, ss
-	ret
-
-GetSs ENDP
-
-GetEs PROC PUBLIC
-
-	mov rax, es
-	ret
-
-GetEs ENDP
-
-GetFs PROC PUBLIC
-
-	mov rax, fs
-	ret
-
-GetFs ENDP
-
-GetGs PROC PUBLIC
-
-	mov rax, gs
-	ret
-
-GetGs ENDP
-
-GetLdtr PROC PUBLIC
-
-	sldt rax
-	ret
-
-GetLdtr ENDP
-
-GetTr PROC PUBLIC
-
-	str rax
-	ret
-
-GetTr ENDP
-
-GetIdtBase PROC PUBLIC
-	
-	local	idtr[10]:BYTE
-
-	sidt idtr
-	mov rax, QWORD PTR idtr[2]
-	ret
-
-GetIdtBase ENDP
-
-GetGdtLimit PROC PUBLIC
-	
-	local gdtr[10]:BYTE
-
-	sgdt gdtr
-	mov ax, WORD PTR gdtr[0]
-	ret
-
-GetGdtLimit ENDP
-
-GetIdtLimit PROC PUBLIC
-
-	local idtr[10]:BYTE
-	
-	sidt idtr
-	mov	ax, WORD PTR idtr[0]
-
-	ret
-
-GetIdtLimit ENDP
-
-GetRflags PROC PUBLIC
-
-	pushfq
-	pop		rax
-	ret
-
-GetRflags ENDP
-
-MSRRead PROC PUBLIC
-
-	rdmsr ; msr[ecx] --> edx:eax
-	shl		rdx, 32
-	or		rax, rdx
-
-	ret
-
-MSRRead ENDP
-
-MSRWrite PROC PUBLIC
-
-	mov		rax, rdx
-	shr		rdx, 32
-	wrmsr
-	ret
-
-MSRWrite ENDP
+AsmGetGdt ENDP
 
 END

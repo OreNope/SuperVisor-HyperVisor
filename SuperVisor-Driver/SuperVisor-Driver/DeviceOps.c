@@ -1,6 +1,6 @@
 #include "DeviceOps.h"
 #include "Processor.h"
-#include "EPT.h"
+#include "SLAT.h"
 
 NTSTATUS DriverCreate(PDEVICE_OBJECT DeviceObj, PIRP Irp)
 {

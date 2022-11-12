@@ -3,6 +3,7 @@
 #include "SLAT.h"
 #include "Memory.h"
 #include "AMDMSR.h"
+#include "SegmentsAndDescriptors.h"
 
 // See "VMCB Layout, Control Area"
 #define SVM_INTERCEPT_MISC1_CPUID       (1UL << 18)
@@ -160,4 +161,4 @@ typedef struct _VIRTUAL_PROCESSOR_DATA
     DECLSPEC_ALIGN(PAGE_SIZE) UINT8 HostStateArea[PAGE_SIZE];
 } VIRTUAL_PROCESSOR_DATA, * PVIRTUAL_PROCESSOR_DATA;
 
-VOID PrepareForVirtualization(_Inout_ PVIRTUAL_PROCESSOR_DATA VpData, _In_ PSHARED_VIRTUAL_PROCESSOR_DATA SharedVpData, _In_ const PCONTEXT ContextRecord);
+VOID SetupVMCBs(_Inout_ PVIRTUAL_PROCESSOR_DATA VpData, _In_ PSHARED_VIRTUAL_PROCESSOR_DATA SharedVpData, _In_ const PCONTEXT ContextRecord);

@@ -1,12 +1,14 @@
 #include "VMCB.h"
+#include <intrin.h>
 
-VOID PrepareForVirtualization(_Inout_ PVIRTUAL_PROCESSOR_DATA VpData, _In_ PSHARED_VIRTUAL_PROCESSOR_DATA SharedVpData, _In_ const PCONTEXT ContextRecord)
+
+VOID SetupVMCBs(_Inout_ PVIRTUAL_PROCESSOR_DATA VpData, _In_ PSHARED_VIRTUAL_PROCESSOR_DATA SharedVpData, _In_ const PCONTEXT ContextRecord)
 {
     DESCRIPTOR_TABLE_REGISTER gdtr, idtr;
     UINT64 guestVmcbPa, hostVmcbPa, hostStateAreaPa, pml4BasePa, msrpmPa;
 
     // Capture the current GDTR and IDTR to use as initial values of the guest mode.
-    _sgdt(&gdtr);
+    AsmGetGdt(&gdtr);
     __sidt(&idtr);
 
     guestVmcbPa = VirtualToPhysicalAddress(&VpData->GuestVmcb);

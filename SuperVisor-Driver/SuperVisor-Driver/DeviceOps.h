@@ -3,7 +3,7 @@
 #include <wdf.h>
 #include <wdm.h>
 #include "Assembly.h"
-#include "VMX.h"
+#include "SVM.h"
 
 NTSTATUS DriverCreate(PDEVICE_OBJECT DeviceObj, PIRP Irp);
 NTSTATUS DriverClose(PDEVICE_OBJECT DeviceObj, PIRP Irp);
