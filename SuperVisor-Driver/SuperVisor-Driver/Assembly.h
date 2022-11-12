@@ -1,12 +1,17 @@
 #pragma once
+#include <poppack.h>
+#include <pshpack1.h>
+#include <basetsd.h>
 
 // Extern from Assembly.asm file
 
-
 extern void inline AsmVmexitHandler(void);
-extern void inline VmxSaveState(ULONG ProcessorID, PEPTP EPTP);
+extern void inline VmxSaveState(ULONG ProcessorID, PVOID EPTP);
 extern void inline VmxRestoreState();
 extern void inline VmxoffHandler();
+
+extern ULONG64 inline MSRRead(ULONG32 reg);
+extern void inline MSRWrite(ULONG32 reg, ULONG64 MsrValue);
 
 extern void inline AsmEnableVmxeBit(void);
 extern void inline AsmSaveStateForVmxoff(void);
@@ -27,54 +32,56 @@ extern USHORT inline GetGdtLimit();
 extern USHORT inline GetIdtLimit();
 extern ULONG64 inline GetRflags();
 
-typedef union SEGMENT_ATTRIBUTES
+typedef struct _DESCRIPTOR_TABLE_REGISTER
 {
-    USHORT UCHARs;
-    struct
-    {
-        USHORT TYPE : 4; /* 0;  Bit 40-43 */
-        USHORT S : 1;    /* 4;  Bit 44 */
-        USHORT DPL : 2;  /* 5;  Bit 45-46 */
-        USHORT P : 1;    /* 7;  Bit 47 */
-
-        USHORT AVL : 1; /* 8;  Bit 52 */
-        USHORT L : 1;   /* 9;  Bit 53 */
-        USHORT DB : 1;  /* 10; Bit 54 */
-        USHORT G : 1;   /* 11; Bit 55 */
-        USHORT GAP : 4;
-
-    } Fields;
-} SEGMENT_ATTRIBUTES;
-
-typedef struct SEGMENT_SELECTOR
-{
-    USHORT             SEL;
-    SEGMENT_ATTRIBUTES ATTRIBUTES;
-    ULONG32            LIMIT;
-    ULONG64            BASE;
-} SEGMENT_SELECTOR, * PSEGMENT_SELECTOR;
+    UINT16 Limit;
+    ULONG_PTR Base;
+} DESCRIPTOR_TABLE_REGISTER, * PDESCRIPTOR_TABLE_REGISTER;
 
 typedef struct _SEGMENT_DESCRIPTOR
 {
-    USHORT LIMIT0;
-    USHORT BASE0;
-    UCHAR  BASE1;
-    UCHAR  ATTR0;
-    UCHAR  LIMIT1ATTR1;
-    UCHAR  BASE2;
+    union
+    {
+        UINT64 AsUInt64;
+        struct
+        {
+            UINT16 LimitLow;        // [0:15]
+            UINT16 BaseLow;         // [16:31]
+            UINT32 BaseMiddle : 8;  // [32:39]
+            UINT32 Type : 4;        // [40:43]
+            UINT32 System : 1;      // [44]
+            UINT32 Dpl : 2;         // [45:46]
+            UINT32 Present : 1;     // [47]
+            UINT32 LimitHigh : 4;   // [48:51]
+            UINT32 Avl : 1;         // [52]
+            UINT32 LongMode : 1;    // [53]
+            UINT32 DefaultBit : 1;  // [54]
+            UINT32 Granularity : 1; // [55]
+            UINT32 BaseHigh : 8;    // [56:63]
+        } Fields;
+    };
 } SEGMENT_DESCRIPTOR, * PSEGMENT_DESCRIPTOR;
 
-enum SEGREGS
+
+typedef struct _SEGMENT_ATTRIBUTE
 {
-    ES = 0,
-    CS,
-    SS,
-    DS,
-    FS,
-    GS,
-    LDTR,
-    TR
-};
+    union
+    {
+        UINT16 AsUInt16;
+        struct
+        {
+            UINT16 Type : 4;        // [0:3]
+            UINT16 System : 1;      // [4]
+            UINT16 Dpl : 2;         // [5:6]
+            UINT16 Present : 1;     // [7]
+            UINT16 Avl : 1;         // [8]
+            UINT16 LongMode : 1;    // [9]
+            UINT16 DefaultBit : 1;  // [10]
+            UINT16 Granularity : 1; // [11]
+            UINT16 Reserved1 : 4;   // [12:15]
+        } Fields;
+    };
+} SEGMENT_ATTRIBUTE, * PSEGMENT_ATTRIBUTE;
 
 typedef struct _GUEST_REGS
 {
@@ -123,7 +130,7 @@ typedef union _RFLAGS
         unsigned Reserved5 : 1;
         unsigned CF : 1; // Carry flag [Bit 0]
         unsigned Reserved6 : 32;
-    };
+    } Fields;
 
     ULONG64 Content;
 } RFLAGS;

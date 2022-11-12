@@ -36,10 +36,13 @@
     <ClCompile Include="Memory.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="VMX.c">
+    <ClCompile Include="SVM.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="EPT.c">
+    <ClCompile Include="SLAT.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="MsrBitmap.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -50,16 +53,19 @@
     <ClInclude Include="Processor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="IntelMSR.h">
+    <ClInclude Include="AMDMSR.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="VMX.h">
+    <ClInclude Include="SVM.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Assembly.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="EPT.h">
+    <ClInclude Include="SLAT.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MsrBitmap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -42,6 +42,7 @@
     <Configuration>Debug</Configuration>
     <Platform Condition="'$(Platform)' == ''">Win32</Platform>
     <RootNamespace>SuperVisor_Driver</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -140,6 +141,15 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|ARM64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
   </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <LanguageStandard_C>Default</LanguageStandard_C>
+      <TreatWarningAsError>false</TreatWarningAsError>
+    </ClCompile>
+    <Link>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <Inf Include="SuperVisor-Driver.inf" />
   </ItemGroup>
@@ -149,10 +159,11 @@
   <ItemGroup>
     <ClCompile Include="DeviceOps.c" />
     <ClCompile Include="Driver.c" />
-    <ClCompile Include="EPT.c" />
+    <ClCompile Include="MsrBitmap.c" />
+    <ClCompile Include="SLAT.c" />
     <ClCompile Include="Memory.c" />
     <ClCompile Include="Processor.c" />
-    <ClCompile Include="VMX.c" />
+    <ClCompile Include="SVM.c" />
   </ItemGroup>
   <ItemGroup>
     <MASM Include="Assembly.asm" />
@@ -160,10 +171,11 @@
   <ItemGroup>
     <ClInclude Include="Assembly.h" />
     <ClInclude Include="DeviceOps.h" />
-    <ClInclude Include="EPT.h" />
-    <ClInclude Include="IntelMSR.h" />
+    <ClInclude Include="MsrBitmap.h" />
+    <ClInclude Include="SLAT.h" />
+    <ClInclude Include="AMDMSR.h" />
     <ClInclude Include="Processor.h" />
-    <ClInclude Include="VMX.h" />
+    <ClInclude Include="SVM.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

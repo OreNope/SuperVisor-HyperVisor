@@ -6,10 +6,10 @@
 #include "VMX.h"
 
 NTSTATUS DriverCreate(PDEVICE_OBJECT DeviceObj, PIRP Irp);
-NTSTATUS DriverClose(PDEVICE_OBJECT DeviceObject, PIRP Irp);
-NTSTATUS DriverRead(PDEVICE_OBJECT DeviceObject, PIRP Irp);
-NTSTATUS DriverWrite(PDEVICE_OBJECT DeviceObject, PIRP Irp);
-NTSTATUS DriverIoctl(PDEVICE_OBJECT DeviceObject, PIRP Irp);
+NTSTATUS DriverClose(PDEVICE_OBJECT DeviceObj, PIRP Irp);
+NTSTATUS DriverRead(PDEVICE_OBJECT DeviceObj, PIRP Irp);
+NTSTATUS DriverWrite(PDEVICE_OBJECT DeviceObj, PIRP Irp);
+NTSTATUS DriverIoctl(PDEVICE_OBJECT DeviceObj, PIRP Irp);
 NTSTATUS DriverUnsupported(PDEVICE_OBJECT DeviceObj, PIRP Irp);
 
 void PrintIrpInfo(PIRP Irp);

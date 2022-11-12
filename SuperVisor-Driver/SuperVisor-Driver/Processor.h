@@ -2,7 +2,7 @@
 #include <ntddk.h>
 #include <wdf.h>
 #include <wdm.h>
-#include "EPT.h"
+#include "SLAT.h"
 
 
 #define RunOnEachLogicalProcessor(Operations) for (ULONG _LogicalProcessorIndex = 0; _LogicalProcessorIndex < KeQueryActiveProcessorCount(NULL); ++_LogicalProcessorIndex)\
@@ -16,4 +16,4 @@
 typedef void (*PFUNC)(IN ULONG ProcessorID, IN PEPTP EPTP);
 
 BOOLEAN RunOnProcessor(ULONG ProcessorNumber, PEPTP EPTP, PFUNC Routine);
-BOOLEAN IsVmxSupported();
+BOOLEAN IsSvmSupported();

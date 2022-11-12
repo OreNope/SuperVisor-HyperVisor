@@ -1,19 +1,20 @@
 #include "DeviceOps.h"
 #include "Processor.h"
+#include "EPT.h"
 
 NTSTATUS DriverCreate(PDEVICE_OBJECT DeviceObj, PIRP Irp)
 {
 	DbgPrint("[*] DriverCreate Called!");
 
-	PEPTP EPTP = InitializeEptp();
+	PEPTP EPTP = (PEPTP)InitializeEptp();
 	InitializeVmx();
 
-	int LogicalProcessorsCount = KeQueryActiveProcessorCount(0);
+	ULONG LogicalProcessorsCount = KeQueryActiveProcessorCount(0);
 
-	for (size_t i = 0; i < LogicalProcessorsCount; ++i)
+	for (ULONG i = 0; i < LogicalProcessorsCount; ++i)
 	{
 		// Launching VM for Test (in the all logical processor)
-		int ProcessorID = i;
+		ULONG ProcessorID = i;
 
 		// Allocating VMM Stack
 		AllocateVmmStack(ProcessorID);
@@ -21,8 +22,8 @@ NTSTATUS DriverCreate(PDEVICE_OBJECT DeviceObj, PIRP Irp)
 		// Allocating MSR Bit
 		AllocateMsrBitmap(ProcessorID);
 
-		RunOnProcessor(i, EPTP, VmxSaveState);
-		DbgPrint("\n======================================================================================================\n", ProcessorID);
+		RunOnProcessor(ProcessorID, EPTP, VmxSaveState);
+		DbgPrint("\n====================================================================================================\n");
 	}
 
 
@@ -33,7 +34,7 @@ NTSTATUS DriverCreate(PDEVICE_OBJECT DeviceObj, PIRP Irp)
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS DriverClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+NTSTATUS DriverClose(PDEVICE_OBJECT DeviceObj, PIRP Irp)
 {
 	DbgPrint("[*] DriverClose Called!");
 
@@ -47,7 +48,7 @@ NTSTATUS DriverClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 }
 
 
-NTSTATUS DriverRead(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+NTSTATUS DriverRead(PDEVICE_OBJECT DeviceObj, PIRP Irp)
 {
 	DbgPrint("[*] Not implemented yet :( !");
 
@@ -58,7 +59,7 @@ NTSTATUS DriverRead(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS DriverWrite(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+NTSTATUS DriverWrite(PDEVICE_OBJECT DeviceObj, PIRP Irp)
 {
 	DbgPrint("[*] Not implemented yet :( !");
 
@@ -69,7 +70,7 @@ NTSTATUS DriverWrite(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS DriverIoctl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+NTSTATUS DriverIoctl(PDEVICE_OBJECT DeviceObj, PIRP Irp)
 {
 	PIO_STACK_LOCATION IrpStack;
 	NTSTATUS NtStatus = STATUS_SUCCESS;

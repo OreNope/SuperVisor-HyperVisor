@@ -12,7 +12,7 @@ void DriverUnload(PDRIVER_OBJECT DriverObj);
 NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObj, PUNICODE_STRING RegistryPath)
 {
 	NTSTATUS NtStatus = STATUS_SUCCESS;
-	PDRIVER_OBJECT DeviceObject = NULL;
+	PDEVICE_OBJECT DeviceObject = NULL;
 	UNICODE_STRING DriverName, DosDeviceName;
 
 	DbgPrint("DriverEntry Called!");

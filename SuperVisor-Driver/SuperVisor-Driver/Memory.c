@@ -1,4 +1,4 @@
-#include "VMX.h"
+#include "SVM.h"
 
 
 UINT64 VirtualToPhysicalAddress(void* Va)
@@ -11,7 +11,7 @@ UINT64 PhysicalToVirtualAddress(UINT64 Pa)
     PHYSICAL_ADDRESS PhysicalAddr;
     PhysicalAddr.QuadPart = Pa;
 
-    return MmGetVirtualForPhysical(PhysicalAddr);
+    return (UINT64)MmGetVirtualForPhysical(PhysicalAddr);
 }
 
 BOOLEAN AllocateVmxonRegion(VIRTUAL_MACHINE_STATE* GuestState)

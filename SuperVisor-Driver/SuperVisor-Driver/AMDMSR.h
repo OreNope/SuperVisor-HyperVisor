@@ -50,10 +50,48 @@ typedef union _MSR
     {
         ULONG Low;
         ULONG High;
-    };
+    } Fields;
 
     ULONG64 Content;
 } MSR, * PMSR;
+
+
+//
+// See "SVM Related MSRs"
+//
+#define SVM_MSR_VM_CR                   0xc0010114
+#define SVM_MSR_VM_HSAVE_PA             0xc0010117
+
+#define SVM_VM_CR_SVMDIS                (1UL << 4)
+
+
+#define IA32_MSR_PAT    0x00000277
+#define IA32_MSR_EFER   0xc0000080
+
+#define EFER_SVME       (1UL << 12)
+
+#define RPL_MASK        3
+#define DPL_SYSTEM      0
+
+#define CPUID_FN8000_0001_ECX_SVM                   (1UL << 2)
+#define CPUID_FN0000_0001_ECX_HYPERVISOR_PRESENT    (1UL << 31)
+#define CPUID_FN8000_000A_EDX_NP                    (1UL << 0)
+
+#define CPUID_MAX_STANDARD_FN_NUMBER_AND_VENDOR_STRING          0x00000000
+#define CPUID_PROCESSOR_AND_PROCESSOR_FEATURE_IDENTIFIERS       0x00000001
+#define CPUID_PROCESSOR_AND_PROCESSOR_FEATURE_IDENTIFIERS_EX    0x80000001
+#define CPUID_SVM_FEATURES                                      0x8000000a
+//
+// The Microsoft Hypervisor interface defined constants.
+//
+#define CPUID_HV_VENDOR_AND_MAX_FUNCTIONS   0x40000000
+#define CPUID_HV_INTERFACE                  0x40000001
+
+
+
+
+// old
+
 
 #define MSR_APIC_BASE            0x01B
 #define MSR_IA32_FEATURE_CONTROL 0x03A

@@ -21,6 +21,9 @@ PUBLIC GetGdtLimit
 PUBLIC GetIdtLimit
 PUBLIC GetRflags
 
+PUBLIC MSRRead
+PUBLIC MSRWrite
+
 EXTERN g_StackPointer:QWORD
 EXTERN g_BasePointer:QWORD
 
@@ -164,18 +167,24 @@ VmxRestoreState PROC PUBLIC
 	
 	ret
 	
-VmxRestoreState END
+VmxRestoreState ENDP
 
-AsmEnableVmxeBit PROC PUBLIC
+AsmEnableSvmEnabledBit PROC PUBLIC
 
 	push rax
+	push rcx
+	push rdx
+	push rbx
 
-	xor rax, rax
-	mov rax, cr4
+	mov rcx, 0xc0000080 ; IA32_MSR_EFER
+	rdmsr
+	mov ebx, 0x1000 ; 1 << 12
+	or eax, ebx ; turn on the 12 bit
+	wrmsr ; update the EFER
 
-	or rax, 2000h	; Turn on the 14th bit (index 13)
-	mov cr4, rax
-	
+	pop rbx
+	pop rdx
+	pop rcx
 	pop rax
 	ret
 
@@ -297,10 +306,10 @@ GetGdtLimit ENDP
 
 GetIdtLimit PROC PUBLIC
 
-	local	idtr[10]:BYTE
+	local idtr[10]:BYTE
 	
-	sidt	idtr
-	mov		ax, WORD PTR idtr[0]
+	sidt idtr
+	mov	ax, WORD PTR idtr[0]
 
 	ret
 
@@ -313,5 +322,24 @@ GetRflags PROC PUBLIC
 	ret
 
 GetRflags ENDP
+
+MSRRead PROC PUBLIC
+
+	rdmsr ; msr[ecx] --> edx:eax
+	shl		rdx, 32
+	or		rax, rdx
+
+	ret
+
+MSRRead ENDP
+
+MSRWrite PROC PUBLIC
+
+	mov		rax, rdx
+	shr		rdx, 32
+	wrmsr
+	ret
+
+MSRWrite ENDP
 
 END

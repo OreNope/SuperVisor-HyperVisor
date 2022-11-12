@@ -1,7 +1,7 @@
 #pragma once
 
 std::string GetCpuID();
-bool DetectVmxSupport();
+bool DetectSvmSupport();
 
 #define BUFF_SIZE 1000
 

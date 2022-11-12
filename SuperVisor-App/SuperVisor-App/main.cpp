@@ -10,23 +10,23 @@ int main()
 
 	std::cout << "[*] The CPU Vendor is: " << CpuID << std::endl;
 
-	if (CpuID == "GenuineIntel")
+	if (CpuID == "AuthenticAMD")
 	{
-		std::cout << "[*] The CPU virtualization technology is VT-x." << std::endl;
+		std::cout << "[*] The CPU virtualization technology is AMD-V." << std::endl;
 	}
 	else
 	{
-		std::cout << "[*] We are currently doesn't support to run in a non-VT-x environment!" << std::endl;
+		std::cout << "[*] We are currently doesn't support to run in a non-AMD-V environment!" << std::endl;
 		return 1;
 	}
 
-	if (DetectVmxSupport())
+	if (DetectSvmSupport())
 	{
-		std::cout << "[*] VMX Operation is supported by your processor." << std::endl;
+		std::cout << "[*] SVM Operation is supported by your processor." << std::endl;
 	}
 	else
 	{
-		std::cout << "[*] VMX Operation is not supported by your processor." << std::endl;
+		std::cout << "[*] SVM Operation is not supported by your processor." << std::endl;
 		return 1;
 	}
 
@@ -42,7 +42,7 @@ int main()
 	if (Handle == INVALID_HANDLE_VALUE)
 	{
 		DWORD ErrNum = GetLastError();
-		std::cerr << "[*] CreateFile failed : %d" << ErrNum << std::endl;
+		std::cerr << "[*] CreateFile failed: " << ErrNum << std::endl;
 		return 1;
 	}
 
@@ -96,20 +96,19 @@ std::string GetCpuID()
 	return CpuID;
 }
 
-bool DetectVmxSupport()
+bool DetectSvmSupport()
 {
-	bool VMX = false;
+	bool SVM = false;
 
 	__asm {
-		XOR EAX, EAX
-		INC EAX
-		CPUID
-		BT ECX, 0x5 // Check for the 6th bit (index 5)
-		JNC VMXNotSupport
-		// Supported (set vmx to true)
-		MOV VMX, 0x1
-		VMXNotSupport:
+		mov eax, 0x80000001
+		cpuid
+		bt ecx, 2 // Check for the 3th bit (index 2)
+		jnc SVMNotSupport
+		// Supported (set SVM to true)
+		mov SVM, 1
+		SVMNotSupport:
 	}
 
-	return VMX;
+	return SVM;
 }
