@@ -48,6 +48,12 @@
     <ClCompile Include="VMCB.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="SegmentsAndDescriptors.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CaptureContext.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DeviceOps.h">
@@ -75,6 +81,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Memory.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="SegmentsAndDescriptors.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CaptureContext.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

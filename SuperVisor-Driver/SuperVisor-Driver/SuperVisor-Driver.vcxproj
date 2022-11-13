@@ -157,9 +157,11 @@
     <FilesToPackage Include="$(TargetPath)" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="CaptureContext.c" />
     <ClCompile Include="DeviceOps.c" />
     <ClCompile Include="Driver.c" />
     <ClCompile Include="MsrBitmap.c" />
+    <ClCompile Include="SegmentsAndDescriptors.c" />
     <ClCompile Include="SLAT.c" />
     <ClCompile Include="Memory.c" />
     <ClCompile Include="Processor.c" />
@@ -171,9 +173,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Assembly.h" />
+    <ClInclude Include="CaptureContext.h" />
     <ClInclude Include="DeviceOps.h" />
     <ClInclude Include="Memory.h" />
     <ClInclude Include="MsrBitmap.h" />
+    <ClInclude Include="SegmentsAndDescriptors.h" />
     <ClInclude Include="SLAT.h" />
     <ClInclude Include="AMDMSR.h" />
     <ClInclude Include="Processor.h" />

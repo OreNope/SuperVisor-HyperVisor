@@ -1,6 +1,5 @@
 #pragma once
 #include <ntddk.h>
-#include <wdf.h>
 #include <intrin.h>
 #include "AMDMSR.h"
 #include "Assembly.h"
@@ -8,6 +7,7 @@
 #include "VMCB.h"
 #include "Memory.h"
 #include "SegmentsAndDescriptors.h"
+#include "CaptureContext.h"
 
 #define ALIGNMENT_PAGE_SIZE 4096
 #define MAXIMUM_ADDRESS     0xffffffffffffffff
@@ -230,7 +230,9 @@ typedef struct _EVENTINJ
 } EVENTINJ, * PEVENTINJ;
 
 BOOLEAN InitializeSvm();
+BOOLEAN TerminateSvm();
 BOOLEAN VirtualizeProcessor(PSHARED_VIRTUAL_PROCESSOR_DATA SharedVpData);
+NTSTATUS DevirtualizeProcessor(_In_opt_ PSHARED_VIRTUAL_PROCESSOR_DATA* sharedVpDataPtr);
 BOOLEAN HandleVmExit(_Inout_ PVIRTUAL_PROCESSOR_DATA VpData, _Inout_ PGUEST_REGISTERS GuestRegisters);
 VOID HandleCpuid(_Inout_ PVIRTUAL_PROCESSOR_DATA VpData, _Inout_ PGUEST_CONTEXT GuestContext);
 VOID HandleMsrAccess(_Inout_ PVIRTUAL_PROCESSOR_DATA VpData, _Inout_ PGUEST_CONTEXT GuestContext);

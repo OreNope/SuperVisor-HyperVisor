@@ -6,26 +6,7 @@ NTSTATUS DriverCreate(PDEVICE_OBJECT DeviceObj, PIRP Irp)
 {
 	DbgPrint("[*] DriverCreate Called!");
 
-	PEPTP EPTP = (PEPTP)InitializeEptp();
-	InitializeVmx();
-
-	ULONG LogicalProcessorsCount = KeQueryActiveProcessorCount(0);
-
-	for (ULONG i = 0; i < LogicalProcessorsCount; ++i)
-	{
-		// Launching VM for Test (in the all logical processor)
-		ULONG ProcessorID = i;
-
-		// Allocating VMM Stack
-		AllocateVmmStack(ProcessorID);
-
-		// Allocating MSR Bit
-		AllocateMsrBitmap(ProcessorID);
-
-		RunOnProcessor(ProcessorID, EPTP, VmxSaveState);
-		DbgPrint("\n====================================================================================================\n");
-	}
-
+	InitializeSvm();
 
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	Irp->IoStatus.Information = 0;
@@ -38,7 +19,7 @@ NTSTATUS DriverClose(PDEVICE_OBJECT DeviceObj, PIRP Irp)
 {
 	DbgPrint("[*] DriverClose Called!");
 
-	TerminateVmx();
+	InitializeSvm();
 
 	Irp->IoStatus.Status = STATUS_SUCCESS;
 	Irp->IoStatus.Information = 0;

@@ -84,9 +84,8 @@ LocalVirtualizationLaunch:
         ; Optionally, allocate the trap frame so that Windbg can display stack
         ; trace of the guest while SvHandleVmExit is being executed. The trap
         ; frame fields necessary for this are initialized in SvHandleVmExit.
-        .pushframe
+
         sub     rsp, KTRAP_FRAME_SIZE
-        .allocstack KTRAP_FRAME_SIZE - MACHINE_FRAME_SIZE + 100h
 
         ; Also save guest's GPRs since those are not saved anywhere by the
         ; processor on #VMEXIT and will be destroyed by subsequent host code.
@@ -124,7 +123,6 @@ LocalVirtualizationLaunch:
         movaps xmmword ptr [rsp + 50h], xmm3
         movaps xmmword ptr [rsp + 60h], xmm4
         movaps xmmword ptr [rsp + 70h], xmm5
-        .endprolog
 
         ; Handle #VMEXIT.
         call HandleVmExit

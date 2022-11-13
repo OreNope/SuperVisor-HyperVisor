@@ -1,6 +1,5 @@
 #pragma once
 #include <ntddk.h>
-#include <wdm.h>
 #include <wdf.h>
 #include "Memory.h"
 

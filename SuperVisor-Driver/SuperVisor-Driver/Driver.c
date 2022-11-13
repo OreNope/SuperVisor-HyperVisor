@@ -1,6 +1,5 @@
 #include <ntddk.h>
 #include <wdf.h>
-#include <wdm.h>
 #include "DeviceOps.h"
 
 NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObj, PUNICODE_STRING RegistryPath);

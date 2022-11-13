@@ -1,7 +1,6 @@
 #include "SVM.h"
 #include "Processor.h"
 #include "MsrBitmap.h"
-#include <ntifs.h>
 
 BOOLEAN InitializeSvm()
 {
@@ -11,29 +10,52 @@ BOOLEAN InitializeSvm()
         return FALSE;
     }
 
-    PSHARED_VIRTUAL_PROCESSOR_DATA  sharedVpData = ExAllocatePoolWithTag(NonPagedPool, sizeof(SHARED_VIRTUAL_PROCESSOR_DATA), POOLTAG);
+    PSHARED_VIRTUAL_PROCESSOR_DATA  SharedVpData = ExAllocatePoolWithTag(NonPagedPool, sizeof(SHARED_VIRTUAL_PROCESSOR_DATA), POOLTAG);
 
-    if (!sharedVpData)
+    if (!SharedVpData)
         return FALSE;
 
-    RtlZeroMemory(sharedVpData, sizeof(SHARED_VIRTUAL_PROCESSOR_DATA));
+    RtlZeroMemory(SharedVpData, sizeof(SHARED_VIRTUAL_PROCESSOR_DATA));
 
     PHYSICAL_ADDRESS Highest;
     Highest.QuadPart = ~0ULL;
-    sharedVpData->MsrPermissionsMap = MmAllocateContiguousMemory(SVM_MSR_PERMISSIONS_MAP_SIZE, Highest);
+    SharedVpData->MsrPermissionsMap = MmAllocateContiguousMemory(SVM_MSR_PERMISSIONS_MAP_SIZE, Highest);
 
-    RtlZeroMemory(sharedVpData->MsrPermissionsMap, SVM_MSR_PERMISSIONS_MAP_SIZE);
+    RtlZeroMemory(SharedVpData->MsrPermissionsMap, SVM_MSR_PERMISSIONS_MAP_SIZE);
 
 
-    if (sharedVpData->MsrPermissionsMap)
+    if (SharedVpData->MsrPermissionsMap)
     {
-        ExFreePoolWithTag(sharedVpData, POOLTAG);
+        ExFreePoolWithTag(SharedVpData, POOLTAG);
         return FALSE;
     }
 
-    InitializeSLAT(sharedVpData);
-    InitializeMsrBitmap(sharedVpData->MsrPermissionsMap);
+    InitializeSLAT(SharedVpData);
+    InitializeMsrBitmap(SharedVpData->MsrPermissionsMap);
 
+    RunOnEachLogicalProcessor({
+        if (!VirtualizeProcessor(SharedVpData))
+            return FALSE;
+    });
+
+    return TRUE;
+}
+
+BOOLEAN TerminateSvm()
+{
+    PSHARED_VIRTUAL_PROCESSOR_DATA SharedVpData = NULL;
+
+    // De-virtualize all processors and free shared data when returned.
+
+    RunOnEachLogicalProcessor({
+        DevirtualizeProcessor(&SharedVpData);
+    });
+
+    if (SharedVpData != NULL)
+    {
+        ExFreePoolWithTag(SharedVpData->MsrPermissionsMap, POOLTAG);
+        ExFreePoolWithTag(SharedVpData, POOLTAG);
+    }
 }
 
 BOOLEAN VirtualizeProcessor(PSHARED_VIRTUAL_PROCESSOR_DATA SharedVpData)
@@ -57,9 +79,9 @@ BOOLEAN VirtualizeProcessor(PSHARED_VIRTUAL_PROCESSOR_DATA SharedVpData)
     }
 
     RtlZeroMemory(VpData, sizeof(VIRTUAL_PROCESSOR_DATA));
-
+    
     // captured state is used as an initial state of the guest mode
-    RtlCaptureContext(ContextRecord);
+    MyCaptureContext(ContextRecord);
 
     // Enable SVM by setting EFER.SVME
     __writemsr(IA32_MSR_EFER, __readmsr(IA32_MSR_EFER) | EFER_SVME);
@@ -75,6 +97,42 @@ BOOLEAN VirtualizeProcessor(PSHARED_VIRTUAL_PROCESSOR_DATA SharedVpData)
     __debugbreak(); // int 3h
 
     return TRUE;
+}
+
+NTSTATUS DevirtualizeProcessor(_In_opt_ PSHARED_VIRTUAL_PROCESSOR_DATA* sharedVpDataPtr)
+{
+    CPUID Registers;   // EAX, EBX, ECX, and EDX
+    UINT64 high, low;
+    PVIRTUAL_PROCESSOR_DATA vpData;
+
+    if (!sharedVpDataPtr)
+    {
+        goto Exit;
+    }
+
+    // Ask SimpleSVM hypervisor to deactivate itself. If the hypervisor is
+    // installed, this ECX is set to 'SSVM', and EDX:EAX indicates an address
+    // of per processor data to be freed.
+    __cpuidex((int*)&Registers, CPUID_UNLOAD_SUPERVISOR, CPUID_UNLOAD_SUPERVISOR);
+    if (Registers.ecx != 'SVYV')
+    {
+        goto Exit;
+    }
+
+    DbgPrint("The processor has been de-virtualized.\n");
+
+    // Get an address of per processor data indicated by EDX:EAX.
+    high = Registers.edx;
+    low = Registers.eax & MAXUINT32;
+    vpData = (PVIRTUAL_PROCESSOR_DATA)(high << 32 | low);
+    NT_ASSERT(vpData->HostStackLayout.Reserved1 == MAXUINT64);
+
+    // free per processor data.
+    *sharedVpDataPtr = vpData->HostStackLayout.SharedVpData;
+    ExFreePoolWithTag(vpData, POOLTAG);
+
+Exit:
+    return STATUS_SUCCESS;
 }
 
 BOOLEAN HandleVmExit(_Inout_ PVIRTUAL_PROCESSOR_DATA VpData, _Inout_ PGUEST_REGISTERS GuestRegisters)
